@@ -4,3 +4,5 @@ applications:
   buildpacks:
     - nodejs_buildpack
   command: node server.js
+env:
+    AI_CORE_URL: https://api.ai-core.eu10.hana.ondemand.com
