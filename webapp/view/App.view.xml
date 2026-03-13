@@ -1,1 +1,63 @@
+<mvc:View
+ xmlns:mvc="sap.ui.core.mvc"
+ xmlns="sap.m"
+ controllerName="demo.controller.App">
 
+<Page title="AI Transport Risk Dashboard">
+
+<VBox>
+
+<HBox justifyContent="SpaceAround">
+
+<GenericTile header="Total Transports">
+<TileContent>
+<NumericContent value="{/total}"/>
+</TileContent>
+</GenericTile>
+
+<GenericTile header="High Risk">
+<TileContent>
+<NumericContent value="{/high}"/>
+</TileContent>
+</GenericTile>
+
+<GenericTile header="Medium Risk">
+<TileContent>
+<NumericContent value="{/medium}"/>
+</TileContent>
+</GenericTile>
+
+<GenericTile header="Safe">
+<TileContent>
+<NumericContent value="{/safe}"/>
+</TileContent>
+</GenericTile>
+
+</HBox>
+
+<Table items="{/transports}">
+
+<columns>
+<Column><Text text="Transport"/></Column>
+<Column><Text text="Environment"/></Column>
+<Column><Text text="Risk Score"/></Column>
+<Column><Text text="Status"/></Column>
+</columns>
+
+<items>
+<ColumnListItem>
+<cells>
+<Text text="{transport_id}"/>
+<Text text="{environment}"/>
+<Text text="{risk_score}"/>
+<ObjectStatus text="{status}" state="{state}"/>
+</cells>
+</ColumnListItem>
+</items>
+
+</Table>
+
+</VBox>
+
+</Page>
+</mvc:View>
