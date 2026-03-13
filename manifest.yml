@@ -6,7 +6,7 @@ applications:
       - nodejs_buildpack
     env:
       # AI Core Configuration
-      AI_CORE_URL: "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com"
+      AI_API_URL: "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com"
       AI_CORE_UAA_URL: "https://hclbuild-g03o2ijo.authentication.eu10.hana.ondemand.com"
       AI_CORE_CLIENT_ID: "sb-37c72ab3-7e54-4978-a2f1-1f5aa1e412d5!b227908|aicore!b540"
       AI_CORE_CLIENT_SECRET: "206329fa-84ae-4444-a280-c4ab9a347730$9iNpJcdRQjQTaCk3MH72LK1BQesGbktcEQP2djBeW0E="
@@ -16,6 +16,8 @@ applications:
       CTMS_UAA_URL: "https://transport-service-app-backend.ts.cfapps.eu10.hana.ondemand.com"
       CTMS_CLIENT_ID: "sb-5815b58b-c90b-4116-84b8-487862d5bd0c!b519913|alm-ts-backend!b1896"
       CTMS_CLIENT_SECRET: "76959eb9-a3c7-460e-8ef3-a62f6d1685a6$Klc0xzqacbuzDMiqzcQTSA8t5AokTl0qYS407tJQtXs="
+      BASIC_USER: "ravishankar.ojha@hcltech.com"
+      BASIC_PASS: "Ravi@1011"
  
       # Optional: additional environment variables
       NODE_ENV: "production"
