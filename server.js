@@ -15,7 +15,7 @@ const AI_CORE_URL = process.env.AI_CORE_URL
 const CTMS_CLIENT_ID = process.env.CTMS_CLIENT_ID
 const CTMS_CLIENT_SECRET = process.env.CTMS_CLIENT_SECRET
 const CTMS_UAA_URL = process.env.CTMS_UAA_URL
-const CTMS_URL = process.env.CTMS_URL
+const CTMS_URL = process.env.CTMS_URL  // e.g., https://<ctms_instance>.hana.ondemand.com
 
 // --------- Helper: Get AI Core Bearer Token ---------
 async function getAICoreToken() {
@@ -62,6 +62,8 @@ async function fetchCTMSTransportIDs() {
         const response = await axios.get(`${CTMS_URL}/v1/transports`, {
             headers: { Authorization: `Bearer ${token}` }
         })
+        console.log("Raw CTMS response:", response.data)
+
         const transportIds = response.data.map(t => t.id)
         console.log("Fetched transport IDs from CTMS:", transportIds)
         return transportIds
@@ -78,7 +80,7 @@ app.get("/risk", async (req, res) => {
         if (!transportIds.length) {
             console.warn("No transports found, returning dummy data")
             return res.json([
-                { transport_id: "TR_DUMMY_001", risk_score: 0.5, risk_level: "MEDIUM" }
+                { transport_id: "TR_DUMMY_001", risk_score: 0.5, risk_level: "MEDIUM", note: "Dummy fallback" }
             ])
         }
 
@@ -104,7 +106,6 @@ app.get("/risk", async (req, res) => {
                 })
             } catch (err) {
                 console.error(`AI Core call failed for ${transportId}:`, err.response ? err.response.data : err.message)
-                // Add fallback for this transport
                 results.push({
                     transport_id: transportId,
                     risk_score: 0.5,
