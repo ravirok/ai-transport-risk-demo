@@ -47,7 +47,7 @@ async function getCTMSToken() {
 async function fetchCTMSTransportIDs() {
     try {
         const token = await getCTMSToken()
-        const response = await axios.get(`${CTMS_URL}/v1/transports`, {
+        const response = await axios.get(`${CTMS_URL}/v1/transportRequests`, {
             headers: { Authorization: `Bearer ${token}` }
         })
         console.log("CTMS response:", response.data)
