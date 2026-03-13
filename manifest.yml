@@ -1,0 +1,6 @@
+applications:
+- name: ai-transport-risk-demo
+  memory: 256M
+  buildpacks:
+    - nodejs_buildpack
+  command: node server.js

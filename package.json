@@ -1,0 +1,12 @@
+{
+  "name": "ai-transport-risk-demo",
+  "version": "1.0.0",
+  "description": "AI Transport Risk Dashboard Demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
