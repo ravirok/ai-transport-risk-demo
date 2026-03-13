@@ -1,0 +1,13 @@
+ID: ai-transport-risk-demo
+_schema-version: "3.1"
+version: 1.0.0
+
+modules:
+  - name: ai-transport-risk-demo
+    type: nodejs
+    path: .
+    parameters:
+      memory: 256M
+      disk-quota: 512M
+    build-parameters:
+      builder: npm
