@@ -1,77 +1,37 @@
 const express = require("express")
-const axios = require("axios")
-
 const app = express()
 
 const PORT = process.env.PORT || 3000
 
+// Serve the dashboard UI
 app.use(express.static("public"))
 
-async function getCTMSToken(){
+// /risk API
+app.get("/risk",(req,res)=>{
 
-const response = await axios.post(
-process.env.CTMS_TOKEN_URL,
-`grant_type=client_credentials&client_id=${process.env.CTMS_CLIENT_ID}&client_secret=${process.env.CTMS_CLIENT_SECRET}`,
-{
-headers:{
-"Content-Type":"application/x-www-form-urlencoded"
-}
+    // Get the transport ID from environment variable (set from pipeline)
+    const transportId = process.env.TRANSPORT_ID || "TR000001"
+
+    // Generate risk score (placeholder for AI Core later)
+    const riskScore = Math.random()
+
+    // Determine risk level
+    let riskLevel = "LOW"
+    if(riskScore > 0.7){
+        riskLevel = "HIGH"
+    } else if(riskScore > 0.4){
+        riskLevel = "MEDIUM"
+    }
+
+    // Send JSON response
+    res.json({
+        transport_id: transportId,
+        risk_score: riskScore.toFixed(2),
+        risk_level: riskLevel
+    })
 })
 
-return response.data.access_token
-}
-
-async function getTransports(){
-
-const token = await getCTMSToken()
-
-const response = await axios.get(
-process.env.CTMS_API_URL + "/v2/transports",
-{
-headers:{
-Authorization:`Bearer ${token}`
-}
-})
-
-return response.data
-}
-
-app.get("/risk", async (req,res)=>{
-
-try{
-
-const transports = await getTransports()
-
-const transportId = transports[0].id || "No transport found"
-
-const riskScore = Math.random()
-
-let riskLevel="LOW"
-
-if(riskScore > 0.7){
-riskLevel="HIGH"
-}else if(riskScore > 0.4){
-riskLevel="MEDIUM"
-}
-
-res.json({
-transport_id:transportId,
-risk_score:riskScore.toFixed(2),
-risk_level:riskLevel
-})
-
-}catch(error){
-
-console.error(error)
-
-res.status(500).json({
-error:"Risk service unavailable"
-})
-
-}
-
-})
-
+// Start server
 app.listen(PORT,()=>{
-console.log("Server running on port "+PORT)
+    console.log("Server running on port "+PORT)
 })
