@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Transport Risk Dashboard</title>
+</head>
+
+<body>
+
+<h2>AI Transport Risk Dashboard</h2>
+
+<div id="result">Loading risk...</div>
+
+<script>
+
+async function loadRisk(){
+
+try{
+
+const response = await fetch("/risk")
+const data = await response.json()
+
+document.getElementById("result").innerHTML =
+"Transport ID: " + data.transport_id +
+"<br>Risk Score: " + data.risk_score +
+"<br>Risk Level: " + data.risk_level
+
+}catch(error){
+
+document.getElementById("result").innerHTML =
+"Risk service unavailable"
+
+}
+
+}
+
+window.onload = loadRisk
+
+</script>
+
+</body>
+</html>
