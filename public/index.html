@@ -1,41 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>AI Transport Risk Dashboard</title>
+    <meta charset="UTF-8">
+    <title>AI Transport Risk Dashboard</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #f0f4ff, #d9e4ff);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .dashboard {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 400px;
+            text-align: center;
+            animation: fadeIn 1s ease-in-out;
+        }
+        h1 {
+            color: #1e3a8a;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        .data {
+            font-size: 20px;
+            margin: 15px 0;
+        }
+        .risk-low {
+            color: #16a34a; /* green */
+            font-weight: bold;
+        }
+        .risk-medium {
+            color: #f97316; /* orange */
+            font-weight: bold;
+        }
+        .risk-high {
+            color: #dc2626; /* red */
+            font-weight: bold;
+        }
+        button {
+            margin-top: 25px;
+            padding: 10px 20px;
+            background: #1e3a8a;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        @keyframes fadeIn {
+            from {opacity: 0; transform: translateY(-20px);}
+            to {opacity:1; transform: translateY(0);}
+        }
+    </style>
 </head>
-
 <body>
+    <div class="dashboard">
+        <h1>AI Transport Risk Dashboard</h1>
+        <div class="data">Transport ID: <span id="transportId">-</span></div>
+        <div class="data">Risk Score: <span id="riskScore">-</span></div>
+        <div class="data">Risk Level: <span id="riskLevel">-</span></div>
+        <button onclick="loadRisk()">Refresh</button>
+    </div>
 
-<h2>AI Transport Risk Dashboard</h2>
+    <script>
+        async function loadRisk() {
+            try {
+                const response = await fetch('/risk');
+                const data = await response.json();
 
-<div id="result">Loading risk...</div>
+                document.getElementById('transportId').textContent = data.transport_id;
+                document.getElementById('riskScore').textContent = data.risk_score;
 
-<script>
+                const riskEl = document.getElementById('riskLevel');
+                riskEl.textContent = data.risk_level;
 
-async function loadRisk(){
+                riskEl.className = '';
+                if(data.risk_level === 'LOW') riskEl.classList.add('risk-low');
+                else if(data.risk_level === 'MEDIUM') riskEl.classList.add('risk-medium');
+                else if(data.risk_level === 'HIGH') riskEl.classList.add('risk-high');
 
-try{
+            } catch (err) {
+                console.error("Error fetching risk data:", err);
+                document.getElementById('transportId').textContent = '-';
+                document.getElementById('riskScore').textContent = '-';
+                const riskEl = document.getElementById('riskLevel');
+                riskEl.textContent = 'Error';
+                riskEl.className = 'risk-high';
+            }
+        }
 
-const response = await fetch("/risk")
-const data = await response.json()
-
-document.getElementById("result").innerHTML =
-"Transport ID: " + data.transport_id +
-"<br>Risk Score: " + data.risk_score +
-"<br>Risk Level: " + data.risk_level
-
-}catch(error){
-
-document.getElementById("result").innerHTML =
-"Risk service unavailable"
-
-}
-
-}
-
-window.onload = loadRisk
-
-</script>
-
+        // Load risk on page load
+        loadRisk();
+    </script>
 </body>
 </html>
