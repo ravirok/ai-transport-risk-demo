@@ -1,30 +1,24 @@
 const express = require("express")
-const axios = require("axios")
-
 const app = express()
 
-const token = process.env.AI_CORE_TOKEN
-const aiUrl = process.env.AI_CORE_URL
+const PORT = process.env.PORT || 3000
 
-app.get("/api/transports", async (req,res)=>{
+app.use(express.static("public"))
 
-const response = await axios.post(
-aiUrl + "/v2/inference/deployments/risk-model/predict",
-{
- transport_id:"TMS1001",
- code_complexity:0.5,
- test_coverage:80
-},
-{
- headers:{
-  Authorization:`Bearer ${token}`
- }
+app.get("/", (req,res)=>{
+res.send("AI Transport Risk Dashboard")
 })
 
-res.json(response.data)
+app.get("/risk",(req,res)=>{
+
+res.json({
+transport_id:"TR123456",
+risk_score:0.82,
+risk_level:"HIGH"
+})
 
 })
 
-app.use(express.static("webapp"))
-
-app.listen(8080)
+app.listen(PORT,()=>{
+console.log("Server running on port "+PORT)
+})
