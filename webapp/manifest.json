@@ -1,0 +1,21 @@
+{
+  "sap.app": {
+    "id": "demo",
+    "type": "application",
+    "title": "Transport Risk Dashboard"
+  },
+  "sap.ui": {
+    "technology": "UI5"
+  },
+  "sap.ui5": {
+    "rootView": {
+      "viewName": "demo.view.App",
+      "type": "XML"
+    },
+    "dependencies": {
+      "libs": {
+        "sap.m": {}
+      }
+    }
+  }
+}
