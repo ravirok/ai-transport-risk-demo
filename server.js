@@ -5,59 +5,73 @@ const app = express()
 const PORT = process.env.PORT || 3000
 app.use(express.static("public"))
 
-// Read transport IDs from environment variable (comma-separated)
-const transportIds = process.env.TRANSPORT_IDS
-  ? process.env.TRANSPORT_IDS.split(",")
-  : []
-
-// UAA / AI Core credentials from env
-const CLIENT_ID = process.env.AI_CORE_CLIENT_ID
-const CLIENT_SECRET = process.env.AI_CORE_CLIENT_SECRET
-const UAA_URL = process.env.AI_CORE_UAA_URL
+// ---- AI Core Configuration ----
+const AI_CORE_CLIENT_ID = process.env.AI_CORE_CLIENT_ID
+const AI_CORE_CLIENT_SECRET = process.env.AI_CORE_CLIENT_SECRET
+const AI_CORE_UAA_URL = process.env.AI_CORE_UAA_URL
 const AI_CORE_URL = process.env.AI_CORE_URL
 
-// Function to get Bearer Token from UAA using client id + secret
-async function getBearerToken() {
+// ---- CTMS Configuration ----
+const CTMS_CLIENT_ID = process.env.CTMS_CLIENT_ID
+const CTMS_CLIENT_SECRET = process.env.CTMS_CLIENT_SECRET
+const CTMS_UAA_URL = process.env.CTMS_UAA_URL
+const CTMS_URL = process.env.CTMS_URL  // e.g., https://<ctms_instance>.hana.ondemand.com
+
+// --------- Helper: Get AI Core Bearer Token ---------
+async function getAICoreToken() {
     const params = new URLSearchParams()
     params.append("grant_type", "client_credentials")
-    params.append("client_id", CLIENT_ID)
-    params.append("client_secret", CLIENT_SECRET)
+    params.append("client_id", AI_CORE_CLIENT_ID)
+    params.append("client_secret", AI_CORE_CLIENT_SECRET)
 
-    try {
-        const response = await axios.post(`${UAA_URL}/oauth/token`, params, {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" }
-        })
-        return response.data.access_token
-    } catch (err) {
-        console.error("Error fetching Bearer Token:", err.message)
-        throw err
-    }
+    const response = await axios.post(`${AI_CORE_UAA_URL}/oauth/token`, params, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    })
+    return response.data.access_token
 }
 
-// API endpoint to get risk for all transports
-app.get("/risk", async (req, res) => {
-    if (!transportIds.length) {
-        return res.status(500).json({
-            error: "TRANSPORT_IDS not set",
-            details: "Pipeline should inject CTMS transport IDs automatically"
-        })
-    }
-    if (!CLIENT_ID || !CLIENT_SECRET || !UAA_URL || !AI_CORE_URL) {
-        return res.status(500).json({
-            error: "Missing AI Core credentials",
-            details: "Set AI_CORE_CLIENT_ID, AI_CORE_CLIENT_SECRET, AI_CORE_UAA_URL, AI_CORE_URL"
-        })
-    }
+// --------- Helper: Get CTMS Bearer Token ---------
+async function getCTMSToken() {
+    const params = new URLSearchParams()
+    params.append("grant_type", "client_credentials")
+    params.append("client_id", CTMS_CLIENT_ID)
+    params.append("client_secret", CTMS_CLIENT_SECRET)
 
+    const response = await axios.post(`${CTMS_UAA_URL}/oauth/token`, params, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    })
+    return response.data.access_token
+}
+
+// --------- Helper: Fetch all transport IDs from CTMS ---------
+async function fetchCTMSTransportIDs() {
+    const token = await getCTMSToken()
+    const response = await axios.get(`${CTMS_URL}/v1/transports`, {
+        headers: { Authorization: `Bearer ${token}` }
+    })
+    // Assume response.data is an array of transports: [{ id: "TR123456" }, ...]
+    return response.data.map(t => t.id)
+}
+
+// --------- Endpoint: /risk ---------
+app.get("/risk", async (req, res) => {
     try {
-        const token = await getBearerToken()
+        // Fetch all transports from CTMS
+        const transportIds = await fetchCTMSTransportIDs()
+        if (!transportIds.length) {
+            return res.status(500).json({ error: "No transports found in CTMS" })
+        }
+
+        // Get AI Core token
+        const aiToken = await getAICoreToken()
         const results = []
 
+        // Call AI Core for each transport
         for (const transportId of transportIds) {
             const response = await axios.post(
                 AI_CORE_URL,
                 { transport_id: transportId },
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: { Authorization: `Bearer ${aiToken}` } }
             )
 
             const riskScore = response.data.risk_score
@@ -73,13 +87,13 @@ app.get("/risk", async (req, res) => {
         }
 
         res.json(results)
+
     } catch (err) {
-        console.error("AI Core call failed:", err.message)
-        res.status(500).json({ error: "AI Core call failed", details: err.message })
+        console.error("Error fetching risk:", err.message)
+        res.status(500).json({ error: "Failed to fetch risk", details: err.message })
     }
 })
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
-    console.log("Transport IDs:", transportIds.join(", "))
 })
