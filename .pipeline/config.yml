@@ -1,0 +1,12 @@
+general:
+  buildTool: "npm"
+
+stages:
+
+  Build:
+    npmExecuteScripts:
+      - install
+
+  Acceptance:
+    cloudFoundryDeploy:
+      deployType: standard
