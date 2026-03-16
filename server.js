@@ -28,14 +28,18 @@ app.get("/risk", async (req, res) => {
 
   try {
 
-    // 1️⃣ Get CTMS Token
+    console.log("Fetching CTMS token...");
+
     const ctmsToken = await getToken(
       process.env.CTMS_UAA_URL,
       process.env.CTMS_CLIENT_ID,
       process.env.CTMS_CLIENT_SECRET
     );
 
-    // 2️⃣ Fetch Transport Requests
+    console.log("Token received");
+
+    console.log("Calling CTMS transport API...");
+
     const transports = await axios.get(
       `${process.env.CTMS_URL}/v1/transportRequests`,
       {
@@ -45,7 +49,12 @@ app.get("/risk", async (req, res) => {
       }
     );
 
-    const transportList = transports.data.transports || [];
+    console.log("CTMS response received");
+
+    // FIXED PART
+    const transportList = Array.isArray(transports.data)
+      ? transports.data
+      : transports.data.transports || [];
 
     if (transportList.length === 0) {
       return res.json({
@@ -58,7 +67,7 @@ app.get("/risk", async (req, res) => {
       transportList[0].transportRequestId ||
       "UNKNOWN";
 
-    // 3️⃣ Generate Demo Risk Score
+    // Demo Risk
     const riskScore = Math.random().toFixed(2);
 
     let riskLevel = "LOW";
@@ -74,11 +83,11 @@ app.get("/risk", async (req, res) => {
 
   } catch (error) {
 
-    console.error("Risk Service Error:", error.message);
+    console.error("Risk Service Error:", error.response?.data || error.message);
 
     res.status(500).json({
       error: "Risk service failed",
-      details: error.message
+      details: error.response?.data || error.message
     });
 
   }
