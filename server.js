@@ -7,13 +7,21 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static("public"));
 app.use(express.json());
 
+// Disable caching (fix 304 issue)
+app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
+
 async function getToken(uaaUrl, clientId, clientSecret) {
 
   const response = await axios.post(
     `${uaaUrl}/oauth/token`,
     "grant_type=client_credentials",
     {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
       auth: {
         username: clientId,
         password: clientSecret
@@ -36,11 +44,9 @@ app.get("/risk", async (req, res) => {
       process.env.CTMS_CLIENT_SECRET
     );
 
-    console.log("Token received");
+    console.log("Fetching transports...");
 
-    console.log("Calling CTMS transport API...");
-
-    const transports = await axios.get(
+    const response = await axios.get(
       `${process.env.CTMS_URL}/v1/transportRequests`,
       {
         headers: {
@@ -49,45 +55,58 @@ app.get("/risk", async (req, res) => {
       }
     );
 
-    console.log("CTMS response received");
+    console.log("CTMS Raw Response:", response.data);
 
-    // FIXED PART
-    const transportList = Array.isArray(transports.data)
-      ? transports.data
-      : transports.data.transports || [];
+    const transports =
+      response.data.transports ||
+      response.data ||
+      [];
 
-    if (transportList.length === 0) {
+    if (!transports.length) {
+
       return res.json({
-        message: "No transports found"
+        message: "No transports found",
+        raw_response: response.data
       });
+
     }
 
-    const transportId =
-      transportList[0].id ||
-      transportList[0].transportRequestId ||
-      "UNKNOWN";
+    // Create risk result for each transport
+    const results = transports.map((t) => {
 
-    // Demo Risk
-    const riskScore = Math.random().toFixed(2);
+      const id =
+        t.id ||
+        t.transportRequestId ||
+        t.transportId ||
+        "UNKNOWN";
 
-    let riskLevel = "LOW";
+      const score = Math.random().toFixed(2);
 
-    if (riskScore > 0.7) riskLevel = "HIGH";
-    else if (riskScore > 0.4) riskLevel = "MEDIUM";
+      let level = "LOW";
+
+      if (score > 0.7) level = "HIGH";
+      else if (score > 0.4) level = "MEDIUM";
+
+      return {
+        transport_id: id,
+        risk_score: score,
+        risk_level: level
+      };
+
+    });
 
     res.json({
-      transport_id: transportId,
-      risk_score: riskScore,
-      risk_level: riskLevel
+      total_transports: results.length,
+      transports: results
     });
 
   } catch (error) {
 
-    console.error("Risk Service Error:", error.response?.data || error.message);
+    console.error("Risk Service Error:", error.message);
 
     res.status(500).json({
       error: "Risk service failed",
-      details: error.response?.data || error.message
+      details: error.message
     });
 
   }
