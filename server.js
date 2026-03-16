@@ -5,16 +5,32 @@ const xsenv = require("@sap/xsenv");
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Load bound destinations from BTP
-const services = xsenv.getServices({ ctms: { tag: "destination" } });
-const ctmsDest = services.ctms;
+// Load all bound services dynamically
+const services = xsenv.getServices();
 
-// Extract credentials and URL
+// Print all available services (for debug)
+console.log("Available services:", Object.keys(services));
+
+// Find your connectivity service automatically
+// Adjust the regex to match your service name if needed
+const connectivityServiceName = Object.keys(services).find(name =>
+  name.toLowerCase().includes("connectivity")
+);
+
+if (!connectivityServiceName) {
+  console.error("No connectivity service bound to the app!");
+  process.exit(1);
+}
+
+const ctmsDest = services[connectivityServiceName];
+
+// Extract credentials
 const CTMS_URL = ctmsDest.credentials.URL + "/v1/transportRequests";
 const CLIENT_ID = ctmsDest.credentials.clientid;
 const CLIENT_SECRET = ctmsDest.credentials.clientsecret;
 const TOKEN_URL = ctmsDest.credentials.tokenServiceURL;
 
+// Endpoint: /risk
 app.get("/risk", async (req, res) => {
   try {
     // 1️⃣ Get OAuth token using client credentials
@@ -35,7 +51,7 @@ app.get("/risk", async (req, res) => {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    // 3️⃣ Return JSON to frontend
+    // 3️⃣ Return JSON
     res.json(transportsResp.data);
   } catch (err) {
     console.error("Error fetching transports:", err.response?.data || err.message);
