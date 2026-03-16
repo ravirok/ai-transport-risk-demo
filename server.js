@@ -1,129 +1,84 @@
+// server.js
 const express = require("express");
 const axios = require("axios");
-const qs = require("qs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static("public"));
 app.use(express.json());
+app.use(express.static("public"));
 
-// --------------------------------------------
-// Get OAuth token (AI Core or Destination)
-// --------------------------------------------
+// Utility function to fetch OAuth token from Connectivity service
 async function getToken(tokenUrl, clientId, clientSecret) {
-  try {
-    const data = qs.stringify({ grant_type: "client_credentials" });
-    const response = await axios.post(tokenUrl, data, {
+  const response = await axios.post(
+    tokenUrl,
+    "grant_type=client_credentials",
+    {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      auth: { username: clientId, password: clientSecret },
-    });
-    return response.data.access_token;
-  } catch (err) {
-    console.error("Error fetching token:", err.response?.data || err.message);
-    throw new Error("Token fetch failed");
-  }
-}
-
-// --------------------------------------------
-// Fetch transports from CTMS via BTP Connectivity
-// --------------------------------------------
-async function fetchTransportsFromDestination() {
-  const vcapServices = JSON.parse(process.env.VCAP_SERVICES || "{}");
-  const connectivity = vcapServices.connectivity?.[0]?.credentials;
-
-  if (!connectivity) throw new Error("Connectivity service not found in VCAP_SERVICES");
-
-  console.log("Using Connectivity service URL:", connectivity.url);
-
-  // Verify the URL looks correct
-  if (!connectivity.url.includes("/v1/transportRequests")) {
-    throw new Error(
-      "Destination URL invalid. Must point directly to /v1/transportRequests"
-    );
-  }
-
-  // Get OAuth token for destination
-  const destToken = await getToken(
-    connectivity.tokenurl,
-    connectivity.clientid,
-    connectivity.clientsecret
+      auth: {
+        username: clientId,
+        password: clientSecret
+      }
+    }
   );
-
-  // Call CTMS API via destination URL
-  try {
-    const response = await axios.get(connectivity.url, {
-      headers: { Authorization: `Bearer ${destToken}` },
-    });
-    console.log("CTMS raw response:", response.data);
-    return response.data.transports || [];
-  } catch (err) {
-    console.error("Error calling CTMS API:", err.response?.data || err.message);
-    throw new Error("CTMS API call failed");
-  }
+  return response.data.access_token;
 }
 
-// --------------------------------------------
-// Fetch AI Core status
-// --------------------------------------------
-async function fetchAiCoreStatus() {
-  const aiToken = await getToken(
-    process.env.AI_CORE_UAA_URL,
-    process.env.AI_CORE_CLIENT_ID,
-    process.env.AI_CORE_CLIENT_SECRET
-  );
-
-  const aiResponse = await axios.get(`${process.env.AI_API_URL}/v2/health`, {
-    headers: { Authorization: `Bearer ${aiToken}` },
-  });
-
-  return aiResponse.data;
-}
-
-// --------------------------------------------
-// /risk endpoint
-// --------------------------------------------
 app.get("/risk", async (req, res) => {
   try {
-    const transportList = await fetchTransportsFromDestination();
-
-    if (transportList.length === 0) {
-      return res.json({ message: "No transports found" });
+    // --- 1️⃣ Read Connectivity Service from VCAP_SERVICES ---
+    const vcap = JSON.parse(process.env.VCAP_SERVICES || "{}");
+    if (!vcap.connectivity || vcap.connectivity.length === 0) {
+      throw new Error("Connectivity service not found in VCAP_SERVICES");
     }
 
-    const aiStatus = await fetchAiCoreStatus();
+    const conn = vcap.connectivity[0].credentials;
+    console.log("Using CTMS URL:", conn.url);
+    console.log("Token URL:", conn.tokenurl);
 
-    const transportsWithRisk = transportList.map((t) => {
-      const riskScore = Math.random().toFixed(2);
-      let riskLevel = "LOW";
-      if (riskScore > 0.7) riskLevel = "HIGH";
-      else if (riskScore > 0.4) riskLevel = "MEDIUM";
+    // --- 2️⃣ Get OAuth Token ---
+    const token = await getToken(conn.tokenurl, conn.clientid, conn.clientsecret);
+    console.log("Token fetched successfully");
 
-      return {
-        transport_id: t.id,
-        description: t.description,
-        origin: t.origin,
-        owner: t.owner,
-        state: t.state,
-        risk_score: riskScore,
-        risk_level: riskLevel,
-      };
+    // --- 3️⃣ Call CTMS /v1/transportRequests ---
+    const transportsRes = await axios.get(conn.url, {
+      headers: { Authorization: `Bearer ${token}` }
     });
+
+    console.log("CTMS Response:", transportsRes.data);
+
+    const transportList = transportsRes.data.transports || [];
+    if (transportList.length === 0) {
+      return res.json({
+        message: "No transports found",
+        raw_response: transportsRes.data
+      });
+    }
+
+    const transportId = transportList[0].id || transportList[0].transportRequestId || "UNKNOWN";
+
+    // --- 4️⃣ Generate demo risk score ---
+    const riskScore = Math.random().toFixed(2);
+    let riskLevel = "LOW";
+    if (riskScore > 0.7) riskLevel = "HIGH";
+    else if (riskScore > 0.4) riskLevel = "MEDIUM";
 
     res.json({
-      transports: transportsWithRisk,
-      ai_status: aiStatus,
+      transport_id: transportId,
+      risk_score: riskScore,
+      risk_level: riskLevel,
+      transport_count: transportList.length
     });
-  } catch (err) {
-    console.error("Risk Service Error:", err.message);
+
+  } catch (error) {
+    console.error("Risk Service Error:", error.message);
     res.status(500).json({
       error: "Risk service failed",
-      details: err.message,
+      details: error.message
     });
   }
 });
 
-// --------------------------------------------
-// Start server
-// --------------------------------------------
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
