@@ -13,7 +13,7 @@ applications:
  
       # CTMS Configuration
       CTMS_URL: "https://hcl-integrationsuite-qxeoz78m.ts.cfapps.eu10.hana.ondemand.com"
-      CTMS_UAA_URL: "https://transport-service-app-backend.ts.cfapps.eu10.hana.ondemand.com"
+      CTMS_UAA_URL: "https://hclbuild-g03o2ijo.authentication.eu10.hana.ondemand.com"
       CTMS_CLIENT_ID: "sb-5815b58b-c90b-4116-84b8-487862d5bd0c!b519913|alm-ts-backend!b1896"
       CTMS_CLIENT_SECRET: "76959eb9-a3c7-460e-8ef3-a62f6d1685a6$Klc0xzqacbuzDMiqzcQTSA8t5AokTl0qYS407tJQtXs="
       BASIC_USER: "ravishankar.ojha@hcltech.com"
