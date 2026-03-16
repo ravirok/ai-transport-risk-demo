@@ -1,106 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>AI Transport Risk Dashboard</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #f0f4ff, #d9e4ff);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .dashboard {
-            background: #fff;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            padding: 40px;
-            max-width: 400px;
-            text-align: center;
-            animation: fadeIn 1s ease-in-out;
-        }
-        h1 {
-            color: #1e3a8a;
-            margin-bottom: 30px;
-            font-size: 28px;
-        }
-        .data {
-            font-size: 20px;
-            margin: 15px 0;
-        }
-        .risk-low {
-            color: #16a34a; /* green */
-            font-weight: bold;
-        }
-        .risk-medium {
-            color: #f97316; /* orange */
-            font-weight: bold;
-        }
-        .risk-high {
-            color: #dc2626; /* red */
-            font-weight: bold;
-        }
-        button {
-            margin-top: 25px;
-            padding: 10px 20px;
-            background: #1e3a8a;
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background: #2563eb;
-        }
-        @keyframes fadeIn {
-            from {opacity: 0; transform: translateY(-20px);}
-            to {opacity:1; transform: translateY(0);}
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Transport Risk Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css"/>
+  <style>
+    body {
+      font-family: "72", "72 Bold", "72 Light", Arial, sans-serif;
+      background-color: #f3f3f3;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #0a6ed1;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .container {
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .tile {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s;
+    }
+    .tile:hover {
+      transform: translateY(-5px);
+    }
+    .tile h2 {
+      font-size: 1.2rem;
+      margin: 0 0 0.5rem 0;
+      color: #0a6ed1;
+    }
+    .tile p {
+      margin: 0.2rem 0;
+    }
+    .risk {
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .risk.LOW {
+      color: green;
+    }
+    .risk.MEDIUM {
+      color: orange;
+    }
+    .risk.HIGH {
+      color: red;
+    }
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
+    .loading {
+      text-align: center;
+      font-size: 1.2rem;
+      padding: 2rem;
+      color: #0a6ed1;
+    }
+  </style>
 </head>
 <body>
-    <div class="dashboard">
-        <h1>AI Transport Risk Dashboard</h1>
-        <div class="data">Transport ID: <span id="transportId">-</span></div>
-        <div class="data">Risk Score: <span id="riskScore">-</span></div>
-        <div class="data">Risk Level: <span id="riskLevel">-</span></div>
-        <button onclick="loadRisk()">Refresh</button>
-    </div>
+  <header>AI Transport Risk Dashboard</header>
 
-    <script>
-        async function loadRisk() {
-            try {
-                const response = await fetch('/risk');
-                const data = await response.json();
+  <div id="content" class="container">
+    <div class="loading">Loading transports...</div>
+  </div>
 
-                document.getElementById('transportId').textContent = data.transport_id;
-                document.getElementById('riskScore').textContent = data.risk_score;
+  <footer>
+    &copy; 2026 Saini Medical | AI & Transport Risk Demo
+  </footer>
 
-                const riskEl = document.getElementById('riskLevel');
-                riskEl.textContent = data.risk_level;
+  <script>
+    async function loadTransports() {
+      const content = document.getElementById("content");
+      content.innerHTML = '<div class="loading">Loading transports...</div>';
 
-                riskEl.className = '';
-                if(data.risk_level === 'LOW') riskEl.classList.add('risk-low');
-                else if(data.risk_level === 'MEDIUM') riskEl.classList.add('risk-medium');
-                else if(data.risk_level === 'HIGH') riskEl.classList.add('risk-high');
+      try {
+        const response = await fetch("/risk");
+        const data = await response.json();
 
-            } catch (err) {
-                console.error("Error fetching risk data:", err);
-                document.getElementById('transportId').textContent = '-';
-                document.getElementById('riskScore').textContent = '-';
-                const riskEl = document.getElementById('riskLevel');
-                riskEl.textContent = 'Error';
-                riskEl.className = 'risk-high';
-            }
+        content.innerHTML = "";
+
+        if (data.message) {
+          content.innerHTML = `<div class="loading">${data.message}</div>`;
+          return;
         }
 
-        // Load risk on page load
-        loadRisk();
-    </script>
+        const transports = Array.isArray(data.transports) ? data.transports : [data];
+
+        transports.forEach(tr => {
+          const tile = document.createElement("div");
+          tile.classList.add("tile");
+
+          tile.innerHTML = `
+            <h2>Transport ID: ${tr.id || tr.transport_id || "UNKNOWN"}</h2>
+            <p><strong>Description:</strong> ${tr.description || "N/A"}</p>
+            <p><strong>Origin:</strong> ${tr.origin || "N/A"}</p>
+            <p class="risk ${tr.risk_level || tr.risk_level}"><strong>Risk Level:</strong> ${tr.risk_level || "LOW"}</p>
+            <p><strong>Risk Score:</strong> ${tr.risk_score || "0.00"}</p>
+            <p><strong>AI Status:</strong> ${tr.ai_status?.status || "OK"}</p>
+          `;
+          content.appendChild(tile);
+        });
+
+      } catch (err) {
+        content.innerHTML = `<div class="loading">Error loading transports: ${err.message}</div>`;
+      }
+    }
+
+    window.onload = loadTransports;
+  </script>
 </body>
 </html>
