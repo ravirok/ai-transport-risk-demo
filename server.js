@@ -9,7 +9,7 @@ app.use(express.static("public"));
 app.use(express.json());
 
 // --------------------------------------------
-// Helper: Get OAuth token (AI Core or Destination)
+// Get OAuth token (AI Core or Destination)
 // --------------------------------------------
 async function getToken(tokenUrl, clientId, clientSecret) {
   const data = qs.stringify({ grant_type: "client_credentials" });
@@ -26,20 +26,19 @@ async function getToken(tokenUrl, clientId, clientSecret) {
 // Fetch transports from CTMS via BTP Destination
 // --------------------------------------------
 async function fetchTransportsFromDestination() {
-  // Read VCAP_SERVICES for Connectivity
   const vcapServices = JSON.parse(process.env.VCAP_SERVICES || "{}");
   const connectivity = vcapServices.connectivity?.[0]?.credentials;
 
   if (!connectivity) throw new Error("Connectivity service not found in VCAP_SERVICES");
 
-  // 1️⃣ Get token for the destination
+  // Get OAuth token for destination
   const destToken = await getToken(
-    connectivity.tokenServiceURL,
-    connectivity.clientId,
-    connectivity.clientSecret
+    connectivity.tokenurl,
+    connectivity.clientid,
+    connectivity.clientsecret
   );
 
-  // 2️⃣ Fetch transports
+  // Call CTMS API via destination URL
   const response = await axios.get(`${connectivity.url}/v1/transportRequests`, {
     headers: { Authorization: `Bearer ${destToken}` }
   });
@@ -48,7 +47,7 @@ async function fetchTransportsFromDestination() {
 }
 
 // --------------------------------------------
-// AI Core Health check
+// AI Core Health
 // --------------------------------------------
 async function fetchAiCoreStatus() {
   const aiToken = await getToken(
@@ -69,35 +68,37 @@ async function fetchAiCoreStatus() {
 // --------------------------------------------
 app.get("/risk", async (req, res) => {
   try {
-    // Fetch transports from BTP destination
     const transportList = await fetchTransportsFromDestination();
 
     if (transportList.length === 0) {
-      return res.json({ message: "No transports found", raw_response: transportList });
+      return res.json({ message: "No transports found" });
     }
 
-    const transport = transportList[0]; // take the first transport
-
-    // Fetch AI Core status
     const aiStatus = await fetchAiCoreStatus();
 
-    // Generate demo risk score
-    const riskScore = Math.random().toFixed(2);
-    let riskLevel = "LOW";
-    if (riskScore > 0.7) riskLevel = "HIGH";
-    else if (riskScore > 0.4) riskLevel = "MEDIUM";
+    // Add risk score to each transport
+    const transportsWithRisk = transportList.map(t => {
+      const riskScore = Math.random().toFixed(2);
+      let riskLevel = "LOW";
+      if (riskScore > 0.7) riskLevel = "HIGH";
+      else if (riskScore > 0.4) riskLevel = "MEDIUM";
 
-    // Respond with structured JSON
+      return {
+        transport_id: t.id,
+        description: t.description,
+        origin: t.origin,
+        owner: t.owner,
+        state: t.state,
+        risk_score: riskScore,
+        risk_level: riskLevel
+      };
+    });
+
     res.json({
-      transport_id: transport.id,
-      description: transport.description,
-      origin: transport.origin,
-      owner: transport.owner,
-      state: transport.state,
-      risk_score: riskScore,
-      risk_level: riskLevel,
+      transports: transportsWithRisk,
       ai_status: aiStatus
     });
+
   } catch (err) {
     console.error("Risk Service Error:", err.response?.data || err.message);
     res.status(500).json({
