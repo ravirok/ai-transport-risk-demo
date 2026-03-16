@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static("public"));
 app.use(express.json());
 
-// Disable caching (fix 304 issue)
+// Disable caching (prevents 304 issue)
 app.use((req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
@@ -36,7 +36,7 @@ app.get("/risk", async (req, res) => {
 
   try {
 
-    console.log("Fetching CTMS token...");
+    console.log("Getting CTMS token...");
 
     const ctmsToken = await getToken(
       process.env.CTMS_UAA_URL,
@@ -44,7 +44,7 @@ app.get("/risk", async (req, res) => {
       process.env.CTMS_CLIENT_SECRET
     );
 
-    console.log("Fetching transports...");
+    console.log("Fetching transport requests...");
 
     const response = await axios.get(
       `${process.env.CTMS_URL}/v1/transportRequests`,
@@ -55,12 +55,20 @@ app.get("/risk", async (req, res) => {
       }
     );
 
-    console.log("CTMS Raw Response:", response.data);
+    console.log("CTMS RESPONSE:", JSON.stringify(response.data));
 
-    const transports =
-      response.data.transports ||
-      response.data ||
-      [];
+    // Handle multiple CTMS response formats
+    let transports = [];
+
+    if (Array.isArray(response.data)) {
+      transports = response.data;
+    }
+    else if (Array.isArray(response.data.transports)) {
+      transports = response.data.transports;
+    }
+    else if (Array.isArray(response.data.content)) {
+      transports = response.data.content;
+    }
 
     if (!transports.length) {
 
@@ -71,7 +79,7 @@ app.get("/risk", async (req, res) => {
 
     }
 
-    // Create risk result for each transport
+    // Create risk for each transport
     const results = transports.map((t) => {
 
       const id =
@@ -80,17 +88,17 @@ app.get("/risk", async (req, res) => {
         t.transportId ||
         "UNKNOWN";
 
-      const score = Math.random().toFixed(2);
+      const riskScore = Math.random().toFixed(2);
 
-      let level = "LOW";
+      let riskLevel = "LOW";
 
-      if (score > 0.7) level = "HIGH";
-      else if (score > 0.4) level = "MEDIUM";
+      if (riskScore > 0.7) riskLevel = "HIGH";
+      else if (riskScore > 0.4) riskLevel = "MEDIUM";
 
       return {
         transport_id: id,
-        risk_score: score,
-        risk_level: level
+        risk_score: riskScore,
+        risk_level: riskLevel
       };
 
     });
