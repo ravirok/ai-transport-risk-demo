@@ -1,62 +1,43 @@
-const express = require("express");
-const { executeHttpRequest, Destination } = require("@sap/cloud-sdk-core");
-const xsenv = require("@sap/xsenv");
+const axios = require("axios");
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Using your existing BTP environment variables
+const CTMS_URL = process.env.CTMS_URL + "/v1/transportRequests";
+const TOKEN_URL = process.env.CTMS_UAA_URL + "/oauth/token";
+const CLIENT_ID = process.env.CTMS_CLIENT_ID;
+const CLIENT_SECRET = process.env.CTMS_CLIENT_SECRET;
 
-// Load bound Connectivity service
-const services = xsenv.getServices({ connectivity: { tag: "connectivity" } });
-
-async function getCTMSTransports() {
-    try {
-        // Get destination by name
-        const ctmsDest = await services.connectivity.getDestination("CTMS_TRANSPORT");
-
-        if (!ctmsDest) throw new Error("Destination CTMS_TRANSPORT not found in Connectivity service");
-
-        // Make HTTP GET request using the destination (token fetched automatically)
-        const response = await executeHttpRequest(ctmsDest, {
-            method: "GET",
-            url: ctmsDest.URL // Ensure this ends with /v1/transportRequests
-        });
-
-        return response.data.transports || [];
-    } catch (err) {
-        console.error("Error fetching transports:", err.message);
-        throw err;
-    }
+async function getToken() {
+  try {
+    const response = await axios.post(
+      TOKEN_URL,
+      "grant_type=client_credentials",
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        auth: {
+          username: CLIENT_ID,
+          password: CLIENT_SECRET
+        }
+      }
+    );
+    return response.data.access_token;
+  } catch (err) {
+    console.error("Error fetching token:", err.response?.data || err.message);
+  }
 }
 
-app.get("/risk", async (req, res) => {
-    try {
-        const transports = await getCTMSTransports();
+async function testCTMS() {
+  try {
+    const token = await getToken();
+    if (!token) return;
 
-        if (!transports || transports.length === 0) {
-            return res.json({ message: "No transports found" });
-        }
+    const response = await axios.get(CTMS_URL, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-        const transportId = transports[0].id || "UNKNOWN";
-        const riskScore = Math.random().toFixed(2);
+    console.log("CTMS Response:", JSON.stringify(response.data, null, 2));
+  } catch (err) {
+    console.error("Error fetching transports:", err.response?.data || err.message);
+  }
+}
 
-        let riskLevel = "LOW";
-        if (riskScore > 0.7) riskLevel = "HIGH";
-        else if (riskScore > 0.4) riskLevel = "MEDIUM";
-
-        res.json({
-            transport_id: transportId,
-            risk_score: riskScore,
-            risk_level: riskLevel,
-            transports
-        });
-
-    } catch (error) {
-        console.error("Risk Service Error:", error.message);
-        res.status(500).json({
-            error: "Risk service failed",
-            details: error.message
-        });
-    }
-});
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+testCTMS();
