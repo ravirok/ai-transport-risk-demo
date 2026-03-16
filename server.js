@@ -1,6 +1,5 @@
 const express = require("express");
 const axios = require("axios");
-const qs = require("qs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,75 +8,64 @@ app.use(express.static("public"));
 app.use(express.json());
 
 /**
- * Get OAuth token using client credentials (for XSUAA / CTMS or AI Core)
+ * Get AI Core token
  */
-async function getToken(uaaUrl, clientId, clientSecret) {
-  try {
-    const data = qs.stringify({ grant_type: "client_credentials" });
+async function getAiToken(uaaUrl, clientId, clientSecret) {
+  const qs = require("qs");
+  const data = qs.stringify({ grant_type: "client_credentials" });
 
-    const response = await axios.post(`${uaaUrl}/oauth/token`, data, {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      auth: {
-        username: clientId,
-        password: clientSecret
-      }
-    });
+  const response = await axios.post(`${uaaUrl}/oauth/token`, data, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    auth: {
+      username: clientId,
+      password: clientSecret
+    }
+  });
 
-    return response.data.access_token;
-  } catch (err) {
-    console.error("Token fetch error:", err.response?.data || err.message);
-    throw err;
-  }
+  return response.data.access_token;
 }
 
 app.get("/risk", async (req, res) => {
   try {
-    // 1️⃣ Get CTMS token
-    const ctmsToken = await getToken(
-      process.env.CTMS_UAA_URL,
-      process.env.CTMS_CLIENT_ID,
-      process.env.CTMS_CLIENT_SECRET
-    );
-
-    // 2️⃣ Fetch transport requests from CTMS
-    const transportsResponse = await axios.get(
-      `${process.env.CTMS_URL}/v1/transportRequests`,
+    // 1️⃣ Mock transport list
+    const transportList = [
       {
-        headers: { Authorization: `Bearer ${ctmsToken}` }
+        id: 355,
+        description: "3a3dc51 - Update server.js",
+        origin: "AI_NODE",
+        owner: "Piper-Pipeline",
+        state: "RELEASED"
+      },
+      {
+        id: 342,
+        description: "2986e33 - Update server.js",
+        origin: "AI_NODE",
+        owner: "Piper-Pipeline",
+        state: "RELEASED"
       }
-    );
+    ];
 
-    const transportList = transportsResponse.data.transports || [];
-
-    if (transportList.length === 0) {
-      return res.json({
-        message: "No transports found",
-        raw_response: transportsResponse.data
-      });
-    }
-
-    // Take the first transport for demo
     const transport = transportList[0];
 
-    // 3️⃣ Get AI Core token
-    const aiToken = await getToken(
+    // 2️⃣ Get AI Core token
+    const aiToken = await getAiToken(
       process.env.AI_CORE_UAA_URL,
       process.env.AI_CORE_CLIENT_ID,
       process.env.AI_CORE_CLIENT_SECRET
     );
 
-    // 4️⃣ Check AI Core health (optional)
+    // 3️⃣ Check AI Core health
     const aiResponse = await axios.get(`${process.env.AI_API_URL}/v2/health`, {
       headers: { Authorization: `Bearer ${aiToken}` }
     });
 
-    // 5️⃣ Generate demo risk score
+    // 4️⃣ Generate risk score
     const riskScore = Math.random().toFixed(2);
     let riskLevel = "LOW";
     if (riskScore > 0.7) riskLevel = "HIGH";
     else if (riskScore > 0.4) riskLevel = "MEDIUM";
 
-    // 6️⃣ Return JSON
+    // 5️⃣ Return JSON
     res.json({
       transport_id: transport.id,
       description: transport.description,
