@@ -1,19 +1,23 @@
 const express = require("express");
 const axios = require("axios");
+const xsenv = require("@sap/xsenv");
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Env variables (set these in BTP Cockpit)
-const CTMS_URL = process.env.CTMS_URL + "/v1/transportRequests"; // API URL
-const TOKEN_URL = process.env.CTMS_UAA_URL + "/oauth/token";      // token endpoint
-const CLIENT_ID = process.env.CTMS_CLIENT_ID;
-const CLIENT_SECRET = process.env.CTMS_CLIENT_SECRET;
+// Load bound destinations from BTP
+const services = xsenv.getServices({ ctms: { tag: "destination" } });
+const ctmsDest = services.ctms;
 
-// /risk endpoint
+// Extract credentials and URL
+const CTMS_URL = ctmsDest.credentials.URL + "/v1/transportRequests";
+const CLIENT_ID = ctmsDest.credentials.clientid;
+const CLIENT_SECRET = ctmsDest.credentials.clientsecret;
+const TOKEN_URL = ctmsDest.credentials.tokenServiceURL;
+
 app.get("/risk", async (req, res) => {
   try {
-    // 1️⃣ Get OAuth token
+    // 1️⃣ Get OAuth token using client credentials
     const tokenResp = await axios.post(
       TOKEN_URL,
       "grant_type=client_credentials",
@@ -31,7 +35,7 @@ app.get("/risk", async (req, res) => {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    // 3️⃣ Return JSON
+    // 3️⃣ Return JSON to frontend
     res.json(transportsResp.data);
   } catch (err) {
     console.error("Error fetching transports:", err.response?.data || err.message);
