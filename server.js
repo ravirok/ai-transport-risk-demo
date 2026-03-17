@@ -1,91 +1,105 @@
 const express = require("express");
 const axios = require("axios");
 const fs = require("fs");
+const path = require("path");
  
 const app = express();
 const PORT = process.env.PORT || 3000;
  
 /* =========================
-   LOAD CONFIG
+   LOAD CONFIG FILES
 ========================= */
 const ctms = JSON.parse(fs.readFileSync("./ctms-key.json"));
 const ai = JSON.parse(fs.readFileSync("./ai-core-key.json"));
  
 /* =========================
-   SERVE UI
+   SERVE FRONTEND
 ========================= */
-app.use(express.static("public"));
- 
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/public/index.html");
-});
+app.use(express.static(path.join(__dirname, "public")));
  
 /* =========================
    TOKEN FUNCTION
 ========================= */
-async function getToken(uua) {
-  const res = await axios.get(uua.url + "/oauth/token", {
+async function getToken(uaa) {
+  const res = await axios.get(uaa.url + "/oauth/token", {
     params: { grant_type: "client_credentials" },
     auth: {
-      username: uua.clientid,
-      password: uua.clientsecret
+      username: uaa.clientid,
+      password: uaa.clientsecret
     }
   });
   return res.data.access_token;
 }
  
 /* =========================
-   FETCH CTMS
+   FETCH CTMS TRANSPORTS
 ========================= */
 async function getTransports() {
   const token = await getToken(ctms.uaa);
  
-  const res = await axios.get(`${ctms.uri}/v1/transportRequests`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const res = await axios.get(
+    `${ctms.uri}/v1/transportRequests`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
  
-  // Always return array
-  return Array.isArray(res.data)
-    ? res.data
-    : res.data.transports || [];
+  // Handle different response formats
+  return res.data?.transports || res.data || [];
 }
  
 /* =========================
-   AI CORE CALL (FIXED)
+   AI CORE CALL (GENAI)
 ========================= */
-async function callAI(transportList) {
+async function callAI(transports) {
   try {
     const token = await getToken(ai);
  
-    const DEPLOYMENT_ID = "d0a821607261e42f"; // 🔴 replace this
-    const RESOURCE_GROUP = "default"; // 🔴 change if needed
+    // Limit data to avoid token errors
+    const limited = transports.slice(0, 5);
  
-    const AI_URL =
-      ai.serviceurls.AI_API_URL +
-      `/v2/inference/deployments/${DEPLOYMENT_ID}/generate`;
+    const prompt = `
+Analyze SAP transports and return ONLY JSON array:
  
-    console.log("AI URL:", AI_URL);
-    console.log("Resource Group:", RESOURCE_GROUP);
+[
+  {
+    "id": "string",
+    "risk_score": number (0 to 1),
+    "risk_level": "LOW | MEDIUM | HIGH"
+  }
+]
  
-    const payload = {
-      instances: transportList.map(tr => ({
-        text: `${tr.description || ""} ${tr.origin || ""}`
-      }))
-    };
+Data:
+${JSON.stringify(limited.map(t => ({
+  id: t.id || t.transport_id,
+  description: t.description || ""
+})))}
+`;
  
-    const res = await axios.post(AI_URL, payload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
- 
-        // ✅ RESOURCE GROUP ADDED HERE
-        "AI-Resource-Group": RESOURCE_GROUP,
- 
-        "Content-Type": "application/json"
+    const res = await axios.post(
+      ai.serviceurls.AI_API_URL + "/v2/inference/generate",
+      {
+        model: "gpt-4",   // adjust if needed
+        messages: [
+          { role: "user", content: prompt }
+        ]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "AI-Resource-Group": "default",
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
  
-    console.log("✅ AI SUCCESS");
-    return res.data;
+    const text = res.data?.choices?.[0]?.message?.content;
+ 
+    console.log("✅ AI RESPONSE:", text);
+ 
+    return JSON.parse(text);
  
   } catch (e) {
     console.error("❌ AI ERROR:", e.response?.data || e.message);
@@ -123,27 +137,33 @@ function fallbackRisk(tr) {
 ========================= */
 app.get("/risk", async (req, res) => {
   try {
-    const transportList = await getTransports();
+    const transports = await getTransports();
  
-    if (!transportList.length) {
-      return res.json({ message: "No transports found" });
+    if (!Array.isArray(transports)) {
+      throw new Error("Transport data invalid");
     }
  
-    let aiResult = await callAI(transportList);
+    const aiData = await callAI(transports);
  
     let finalData;
  
-    if (aiResult && aiResult.predictions) {
+    if (aiData && Array.isArray(aiData)) {
       // AI SUCCESS
-      finalData = transportList.map((tr, i) => ({
-        ...tr,
-        risk_score: aiResult.predictions[i]?.score || "0.5",
-        risk_level: aiResult.predictions[i]?.label || "MEDIUM",
-        ai_status: { status: "AI_CORE" }
-      }));
+      finalData = transports.map(tr => {
+        const match = aiData.find(
+          a => a.id == (tr.id || tr.transport_id)
+        );
+ 
+        return {
+          ...tr,
+          risk_score: match?.risk_score || "0.5",
+          risk_level: match?.risk_level || "MEDIUM",
+          ai_status: { status: "AI_CORE" }
+        };
+      });
     } else {
       // FALLBACK
-      finalData = transportList.map(tr => ({
+      finalData = transports.map(tr => ({
         ...tr,
         ...fallbackRisk(tr)
       }));
@@ -157,7 +177,7 @@ app.get("/risk", async (req, res) => {
     res.json([
       {
         id: "ERROR",
-        description: "System failure",
+        description: "System failed",
         risk_level: "HIGH",
         risk_score: "1.0",
         ai_status: { status: "SYSTEM_ERROR" }
@@ -172,4 +192,3 @@ app.get("/risk", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
- 
