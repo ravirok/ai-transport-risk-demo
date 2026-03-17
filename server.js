@@ -10,7 +10,7 @@ const port = process.env.PORT || 8080;
 const CLIENT_ID = ctmsKey.uaa.clientid;
 const CLIENT_SECRET = ctmsKey.uaa.clientsecret;
 const TOKEN_URL = ctmsKey.uaa.url + "/oauth/token";
-const CTMS_URL = ctmsKey.uri + "/ctms/v1/transportRequests";
+const CTMS_URL = ctmsKey.uri + "/v1/transportRequests";
  
 // Endpoint to fetch transport requests
 app.get("/risk", async (req, res) => {
