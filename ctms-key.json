@@ -1,0 +1,21 @@
+{
+  "uri": "https://transport-service-app-backend.ts.cfapps.eu10.hana.ondemand.com",
+  "uaa": {
+    "tenantmode": "dedicated",
+    "sburl": "https://internal-xsuaa.authentication.eu10.hana.ondemand.com",
+    "subaccountid": "96e8107f-a574-4245-adeb-71fd2492de43",
+    "credential-type": "binding-secret",
+    "clientid": "sb-ddf0bce3-5cdc-4acd-a625-ac4baac0cdcc!b519913|alm-ts-backend!b1896",
+    "xsappname": "ddf0bce3-5cdc-4acd-a625-ac4baac0cdcc!b519913|alm-ts-backend!b1896",
+    "clientsecret": "5236aeb1-1ab7-4966-89c1-98ba7af62b20$rmnJPclZPUV5R-6MTvoFrY6n7DNUYra7lakkIA18Gdk=",
+    "serviceInstanceId": "ddf0bce3-5cdc-4acd-a625-ac4baac0cdcc",
+    "url": "https://hcl-integrationsuite-qxeoz78m.authentication.eu10.hana.ondemand.com",
+    "uaadomain": "authentication.eu10.hana.ondemand.com",
+    "verificationkey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArXFPHuKnRALzQTHfKyNm\nNMlolWo/cl0xUt5wae0ukWLKd50WM2w7iudZei5riKgn8NAbZJ5//8DQJVM0rjjm\nkM5etfUFYD/wUBT6xkm9PohH78e5rd2JZryvEHB/9wnmEgcwBec7zpRP3E0bdYfD\nfGdznrz2XU9QCCWi2QvChjnEBFYqn+GLkeDrH6/nrrIQxiX1TCYY2+T5lEVwGd9R\ntuXXf04kmiyhAB2aawogX9wjTe3S+1LrNEh4whoT+ZVdUutbV2a+U2f7V4Jg8u1C\n4boEgFF34ANMS3p71SBeWmk/RNB9yE8S9KFrirhuuIVc6wE75XpemJ7G7VjImQpH\nCQIDAQAB\n-----END PUBLIC KEY-----",
+    "apiurl": "https://api.authentication.eu10.hana.ondemand.com",
+    "identityzone": "hcl-integrationsuite-qxeoz78m",
+    "identityzoneid": "96e8107f-a574-4245-adeb-71fd2492de43",
+    "tenantid": "96e8107f-a574-4245-adeb-71fd2492de43",
+    "zoneid": "96e8107f-a574-4245-adeb-71fd2492de43"
+  }
+}
