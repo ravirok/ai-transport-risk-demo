@@ -4,7 +4,7 @@ const qs = require("qs");
 const path = require("path");
 const bodyParser = require("body-parser");
  
-// Load your service keys
+// Load service keys
 const ctmsKey = require("./ctms-key.json");       // CTMS service key
 const aiCoreKey = require("./ai-core-key.json");  // AI Core service key
  
@@ -15,7 +15,7 @@ const port = process.env.PORT || 8080;
 // Middleware
 // -------------------------
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public"))); // serve public folder
+app.use(express.static(path.join(__dirname, "public"))); // Serve public folder
  
 // -------------------------
 // AI Core config
@@ -60,19 +60,22 @@ async function getTransports() {
 // -------------------------
 app.get("/risk", async (req, res) => {
   try {
+    // Fetch transports
     const transports = await getTransports();
- 
     if (!Array.isArray(transports) || transports.length === 0)
       return res.json({ message: "No transports found" });
  
+    // Fetch AI Core token
     const token = await getAICoreToken();
  
+    // Call AI Core scoring
     const aiResp = await axios.post(
       AI_CORE_URL,
       transports,
       { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
     );
  
+    // Merge AI results
     const scoredTransports = transports.map((tr, i) => {
       const aiResult = aiResp.data[i] || {};
       const riskScore = aiResult.risk_score ?? 0;
@@ -99,3 +102,4 @@ app.get("/", (req, res) => {
 // Start server
 // -------------------------
 app.listen(port, () => console.log(`Server running on port ${port}`));
+ 
