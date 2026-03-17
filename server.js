@@ -1,170 +1,156 @@
 const express = require("express");
 const axios = require("axios");
-const qs = require("qs");
-const path = require("path");
-const bodyParser = require("body-parser");
+const fs = require("fs");
  
-// Load service keys
-const ctmsKey = require("./ctms-key.json");
-const aiCoreKey = require("./ai-core-key.json");
- 
-// =============================
-// 🔧 CONFIG (UPDATE THESE ONLY)
-// =============================
-const DEPLOYMENT_ID = "d8c15a12e70048c1";
-const RESOURCE_GROUP = "default"; // change if different
- 
-// =============================
 const app = express();
-const port = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
  
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
+/* =========================
+   LOAD CONFIG
+========================= */
+const ctms = JSON.parse(fs.readFileSync("./ctms-key.json"));
+const ai = JSON.parse(fs.readFileSync("./aicore-key.json"));
  
-// =============================
-// AI CORE CONFIG (v2)
-// =============================
-const AI_CORE_URL =
-  aiCoreKey.serviceurls.AI_API_URL +
-  `/v2/inference/deployments/${DEPLOYMENT_ID}`;
+/* =========================
+   SERVE UI
+========================= */
+app.use(express.static("public"));
  
-const AI_CORE_TOKEN_URL =
-  aiCoreKey.url + "/oauth/token";
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
  
-// =============================
-// Get AI Core Token
-// =============================
-async function getAICoreToken() {
-  const resp = await axios.post(
-    AI_CORE_TOKEN_URL,
-    qs.stringify({ grant_type: "client_credentials" }),
-    {
-      auth: {
-        username: aiCoreKey.clientid,
-        password: aiCoreKey.clientsecret
-      }
+/* =========================
+   TOKEN FUNCTION
+========================= */
+async function getToken(uua) {
+  const res = await axios.get(uua.url + "/oauth/token", {
+    params: { grant_type: "client_credentials" },
+    auth: {
+      username: uua.clientid,
+      password: uua.clientsecret
     }
-  );
-  return resp.data.access_token;
+  });
+  return res.data.access_token;
 }
  
-// =============================
-// Get CTMS Transports
-// =============================
+/* =========================
+   FETCH CTMS
+========================= */
 async function getTransports() {
-  const tokenResp = await axios.post(
-    ctmsKey.uaa.url + "/oauth/token",
-    qs.stringify({ grant_type: "client_credentials" }),
-    {
-      auth: {
-        username: ctmsKey.uaa.clientid,
-        password: ctmsKey.uaa.clientsecret
-      }
-    }
-  );
+  const token = await getToken(ctms.uaa);
  
-  const ctmsToken = tokenResp.data.access_token;
+  const res = await axios.get(`${ctms.uri}/v1/transportRequests`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
  
-  const resp = await axios.get(
-    ctmsKey.uri + "/v1/transportRequests",
-    {
-      headers: {
-        Authorization: `Bearer ${ctmsToken}`
-      }
-    }
-  );
- 
-  return resp.data.transports || resp.data;
+  return res.data;
 }
  
-// =============================
-// /risk endpoint
-// =============================
+/* =========================
+   AI CORE CALL
+========================= */
+async function callAI(transports) {
+  try {
+    const token = await getToken(ai);
+ 
+    const AI_URL =
+      ai.serviceurls.AI_API_URL +
+      "/v2/inference/deployments/d8c15a12e70048c1/invocations";
+ 
+    const payload = {
+      instances: transports.map(tr => ({
+        text: `${tr.description || ""} ${tr.origin || ""}`
+      }))
+    };
+ 
+    const res = await axios.post(AI_URL, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "AI-Resource-Group": "default",
+        "Content-Type": "application/json"
+      }
+    });
+ 
+    console.log("✅ AI SUCCESS");
+    return res.data;
+ 
+  } catch (e) {
+    console.error("❌ AI ERROR:", e.response?.data || e.message);
+    return null;
+  }
+}
+ 
+/* =========================
+   FALLBACK LOGIC
+========================= */
+function fallbackRisk(tr) {
+  let score = 0.3;
+  const text = (tr.description || "").toLowerCase();
+ 
+  if (text.includes("urgent")) score += 0.3;
+  if (text.includes("prod")) score += 0.3;
+  if (text.includes("bug")) score += 0.2;
+  if (text.includes("hotfix")) score += 0.4;
+ 
+  if (score > 1) score = 1;
+ 
+  let level = "LOW";
+  if (score > 0.7) level = "HIGH";
+  else if (score > 0.4) level = "MEDIUM";
+ 
+  return {
+    risk_score: score.toFixed(2),
+    risk_level: level,
+    ai_status: { status: "FALLBACK_AI" }
+  };
+}
+ 
+/* =========================
+   MAIN API
+========================= */
 app.get("/risk", async (req, res) => {
   try {
     const transports = await getTransports();
  
-    if (!Array.isArray(transports) || transports.length === 0) {
-      return res.json({ message: "No transports found" });
-    }
+    let aiResult = await callAI(transports);
  
-    const token = await getAICoreToken();
+    let finalData;
  
-    const aiInput = {
-      input: transports.map(tr => ({
-        id: tr.id || tr.transport_id,
-        description: tr.description || "",
-        origin: tr.origin || ""
-      }))
-    };
- 
-    let aiResp;
- 
-    try {
-      aiResp = await axios.post(
-        AI_CORE_URL,
-        aiInput,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "AI-Resource-Group": RESOURCE_GROUP,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    } catch (e) {
-      console.log("AI failed → using fallback");
- 
-      const fallback = transports.map(tr => {
-        const score = Math.random() * 10;
-        return {
-          ...tr,
-          risk_score: score.toFixed(2),
-          risk_level:
-            score > 7 ? "HIGH" :
-            score > 4 ? "MEDIUM" : "LOW",
-          ai_status: { status: "FALLBACK_AI" }
-        };
-      });
- 
-      return res.json(fallback);
-    }
- 
-    const predictions = aiResp.data?.predictions || [];
- 
-    const result = transports.map((tr, i) => {
-      const score = predictions[i]?.risk_score ?? Math.random() * 10;
- 
-      return {
+    if (aiResult && aiResult.predictions) {
+      finalData = transports.map((tr, i) => ({
         ...tr,
-        risk_score: score.toFixed(2),
-        risk_level:
-          score > 7 ? "HIGH" :
-          score > 4 ? "MEDIUM" : "LOW",
+        risk_score: aiResult.predictions[i]?.score || "0.5",
+        risk_level: aiResult.predictions[i]?.label || "MEDIUM",
         ai_status: { status: "AI_CORE" }
-      };
-    });
+      }));
+    } else {
+      finalData = transports.map(tr => ({
+        ...tr,
+        ...fallbackRisk(tr)
+      }));
+    }
  
-    res.json(result);
+    res.json(finalData);
  
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({
-      message: "Error fetching or scoring transports",
-      error: err.message
-    });
+    console.error("❌ ERROR:", err.message);
+ 
+    res.json([
+      {
+        id: "ERROR",
+        description: "System failure",
+        risk_level: "HIGH",
+        risk_score: "1.0",
+        ai_status: { status: "SYSTEM_ERROR" }
+      }
+    ]);
   }
 });
  
-// =============================
-// Serve UI
-// =============================
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+/* =========================
+   START SERVER
+========================= */
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
- 
-// =============================
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
- 
