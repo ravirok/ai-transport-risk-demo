@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
    LOAD CONFIG
 ========================= */
 const ctms = JSON.parse(fs.readFileSync("./ctms-key.json"));
-const ai = JSON.parse(fs.readFileSync("./aicore-key.json"));
+const ai = JSON.parse(fs.readFileSync("./ai-core-key.json"));
  
 /* =========================
    SERVE UI
