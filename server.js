@@ -44,24 +44,28 @@ async function getTransports() {
     headers: { Authorization: `Bearer ${token}` }
   });
  
-  console.log("✅ CTMS RAW:", JSON.stringify(res.data).slice(0, 200));
- 
-  // ✅ FIX: Always return array
+  // Always return array
   return Array.isArray(res.data)
     ? res.data
     : res.data.transports || [];
 }
  
 /* =========================
-   AI CORE CALL
+   AI CORE CALL (FIXED)
 ========================= */
 async function callAI(transportList) {
   try {
     const token = await getToken(ai);
  
+    const DEPLOYMENT_ID = "d8c15a12e70048c1"; // 🔴 replace this
+    const RESOURCE_GROUP = "default"; // 🔴 change if needed
+ 
     const AI_URL =
       ai.serviceurls.AI_API_URL +
-      "/v2/inference/deployments/d8c15a12e70048c1/invocations";
+      `/v2/inference/deployments/${DEPLOYMENT_ID}/invocations`;
+ 
+    console.log("AI URL:", AI_URL);
+    console.log("Resource Group:", RESOURCE_GROUP);
  
     const payload = {
       instances: transportList.map(tr => ({
@@ -72,7 +76,10 @@ async function callAI(transportList) {
     const res = await axios.post(AI_URL, payload, {
       headers: {
         Authorization: `Bearer ${token}`,
-        "AI-Resource-Group": "default",
+ 
+        // ✅ RESOURCE GROUP ADDED HERE
+        "AI-Resource-Group": RESOURCE_GROUP,
+ 
         "Content-Type": "application/json"
       }
     });
@@ -119,9 +126,7 @@ app.get("/risk", async (req, res) => {
     const transportList = await getTransports();
  
     if (!transportList.length) {
-      return res.json({
-        message: "No transports found"
-      });
+      return res.json({ message: "No transports found" });
     }
  
     let aiResult = await callAI(transportList);
@@ -129,7 +134,7 @@ app.get("/risk", async (req, res) => {
     let finalData;
  
     if (aiResult && aiResult.predictions) {
-      // ✅ AI SUCCESS
+      // AI SUCCESS
       finalData = transportList.map((tr, i) => ({
         ...tr,
         risk_score: aiResult.predictions[i]?.score || "0.5",
@@ -137,7 +142,7 @@ app.get("/risk", async (req, res) => {
         ai_status: { status: "AI_CORE" }
       }));
     } else {
-      // ✅ FALLBACK
+      // FALLBACK
       finalData = transportList.map(tr => ({
         ...tr,
         ...fallbackRisk(tr)
@@ -167,3 +172,4 @@ app.get("/risk", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+ 
