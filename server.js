@@ -1,104 +1,99 @@
 const express = require("express");
 const axios = require("axios");
-const path = require("path");
 const qs = require("qs");
+const path = require("path");
+const bodyParser = require("body-parser");
  
-// -------------------------
-// Load service keys
-// -------------------------
-const ctmsKey = require("./ctms-key.json");
-const aiCoreKey = require("./ai-core-key.json");
+// Load your service keys
+const ctmsKey = require("./ctms-key.json");       // CTMS service key
+const aiCoreKey = require("./ai-core-key.json");  // AI Core service key
  
 const app = express();
 const port = process.env.PORT || 8080;
  
 // -------------------------
-// CTMS config
+// Middleware
 // -------------------------
-const CTMS_CLIENT_ID = ctmsKey.uaa.clientid;
-const CTMS_CLIENT_SECRET = ctmsKey.uaa.clientsecret;
-const CTMS_TOKEN_URL = ctmsKey.uaa.url + "/oauth/token";
-const CTMS_URL = ctmsKey.uri + "/v1/transportRequests";
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, "public"))); // serve public folder
  
 // -------------------------
 // AI Core config
 // -------------------------
-const AI_CORE_URL = aiCoreKey.serviceurls.AI_API_URL;
+const AI_CORE_URL = aiCoreKey.serviceurls.AI_API_URL + "/v1/predict";
 const AI_CORE_CLIENT_ID = aiCoreKey.clientid;
 const AI_CORE_CLIENT_SECRET = aiCoreKey.clientsecret;
 const AI_CORE_TOKEN_URL = aiCoreKey.url + "/oauth/token";
  
 // -------------------------
-// Helper: fetch OAuth token
+// Helper: fetch AI Core token
 // -------------------------
-async function getOAuthToken(clientId, clientSecret, tokenUrl) {
+async function getAICoreToken() {
   const resp = await axios.post(
-    tokenUrl,
+    AI_CORE_TOKEN_URL,
     qs.stringify({ grant_type: "client_credentials" }),
-    { auth: { username: clientId, password: clientSecret } }
+    { auth: { username: AI_CORE_CLIENT_ID, password: AI_CORE_CLIENT_SECRET } }
   );
   return resp.data.access_token;
 }
  
 // -------------------------
-// /risk endpoint
+// Helper: fetch transports from CTMS
+// -------------------------
+async function getTransports() {
+  const tokenResp = await axios.post(
+    ctmsKey.uaa.url + "/oauth/token",
+    qs.stringify({ grant_type: "client_credentials" }),
+    { auth: { username: ctmsKey.uaa.clientid, password: ctmsKey.uaa.clientsecret } }
+  );
+  const ctmsToken = tokenResp.data.access_token;
+ 
+  const resp = await axios.get(ctmsKey.uri + "/v1/transportRequests", {
+    headers: { Authorization: `Bearer ${ctmsToken}` }
+  });
+ 
+  return resp.data.transports || resp.data;
+}
+ 
+// -------------------------
+// Endpoint: GET /risk
 // -------------------------
 app.get("/risk", async (req, res) => {
   try {
-    // 1️⃣ Get CTMS token
-    const ctmsToken = await getOAuthToken(CTMS_CLIENT_ID, CTMS_CLIENT_SECRET, CTMS_TOKEN_URL);
+    const transports = await getTransports();
  
-    // 2️⃣ Fetch transports from CTMS
-    const ctmsResp = await axios.get(CTMS_URL, {
-      headers: { Authorization: `Bearer ${ctmsToken}`, Accept: "application/json" }
-    });
-    const transports = Array.isArray(ctmsResp.data) ? ctmsResp.data : [ctmsResp.data];
+    if (!Array.isArray(transports) || transports.length === 0)
+      return res.json({ message: "No transports found" });
  
-    if (!transports.length) return res.json([]);
+    const token = await getAICoreToken();
  
-    // 3️⃣ Get AI Core token
-    const aiCoreToken = await getOAuthToken(AI_CORE_CLIENT_ID, AI_CORE_CLIENT_SECRET, AI_CORE_TOKEN_URL);
- 
-    // 4️⃣ Map CTMS transports to AI Core expected input
-    const aiInput = transports.map(tr => ({
-      id: tr.id || tr.transport_id,
-      description: tr.description || "",
-      origin: tr.origin || ""
-    }));
- 
-    // 5️⃣ Call AI Core scoring endpoint
     const aiResp = await axios.post(
       AI_CORE_URL,
-      aiInput,
-      { headers: { Authorization: `Bearer ${aiCoreToken}`, "Content-Type": "application/json" } }
+      transports,
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
     );
  
-    // 6️⃣ Merge AI Core results with original CTMS fields
     const scoredTransports = transports.map((tr, i) => {
       const aiResult = aiResp.data[i] || {};
-      const riskScore = aiResult.risk_score !== undefined ? aiResult.risk_score : 0;
+      const riskScore = aiResult.risk_score ?? 0;
       const riskLevel = aiResult.risk_level || (riskScore >= 7 ? "HIGH" : riskScore >= 4 ? "MEDIUM" : "LOW");
-      return {
-        ...tr,
-        risk_score: riskScore,
-        risk_level: riskLevel,
-        ai_status: aiResult.ai_status || { status: "OK" }
-      };
+      return { ...tr, risk_score: riskScore, risk_level: riskLevel, ai_status: aiResult.ai_status || { status: "OK" } };
     });
  
     res.json(scoredTransports);
  
   } catch (err) {
     console.error("Error fetching or scoring transports:", err.response?.data || err.message);
-    if (err.response) res.status(err.response.status).json(err.response.data);
-    else res.status(500).json({ error: err.message });
+    res.status(500).json({ message: "Error fetching or scoring transports", error: err.message });
   }
 });
  
 // -------------------------
-// Serve static files from /public
+// Serve index.html at root
 // -------------------------
-app.use(express.static(path.join(__dirname, "public")));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
  
 // -------------------------
 // Start server
