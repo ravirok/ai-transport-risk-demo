@@ -2,11 +2,11 @@
   "serviceurls": {
     "AI_API_URL": "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com"
   },
-  "appname": "37c72ab3-7e54-4978-a2f1-1f5aa1e412d5!b227908|aicore!b540",
-  "clientid": "sb-37c72ab3-7e54-4978-a2f1-1f5aa1e412d5!b227908|aicore!b540",
-  "clientsecret": "206329fa-84ae-4444-a280-c4ab9a347730$9iNpJcdRQjQTaCk3MH72LK1BQesGbktcEQP2djBeW0E=",
-  "identityzone": "hclbuild-g03o2ijo",
-  "identityzoneid": "c4ab076f-04d6-4ab4-9648-c9e626254aaa",
-  "url": "https://hclbuild-g03o2ijo.authentication.eu10.hana.ondemand.com",
+  "appname": "f3bd5426-ef46-4795-8858-c19b6c5ac964!b519913|aicore!b540",
+  "clientid": "sb-f3bd5426-ef46-4795-8858-c19b6c5ac964!b519913|aicore!b540",
+  "clientsecret": "9796ed28-b3bb-46fd-9a46-91c61551d14c$U4CkTDwIJJQEu3k_Abg_AZOZuGuU4hqXiGlboEufLqc=",
+  "identityzone": "hcl-integrationsuite-qxeoz78m",
+  "identityzoneid": "96e8107f-a574-4245-adeb-71fd2492de43",
+  "url": "https://hcl-integrationsuite-qxeoz78m.authentication.eu10.hana.ondemand.com",
   "credential-type": "binding-secret"
 }
