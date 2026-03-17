@@ -1,39 +1,19 @@
 const express = require("express");
 const axios = require("axios");
-const xsenv = require("@sap/xsenv");
-
+const path = require("path");
+ 
 const app = express();
-const port = process.env.PORT || 3000;
-
-// Load all bound services dynamically
-const services = xsenv.getServices();
-
-// Print all available services (for debug)
-console.log("Available services:", Object.keys(services));
-
-// Find your connectivity service automatically
-// Adjust the regex to match your service name if needed
-const connectivityServiceName = Object.keys(services).find(name =>
-  name.toLowerCase().includes("connectivity")
-);
-
-if (!connectivityServiceName) {
-  console.error("No connectivity service bound to the app!");
-  process.exit(1);
-}
-
-const ctmsDest = services[connectivityServiceName];
-
-// Extract credentials
-const CTMS_URL = ctmsDest.credentials.URL + "/v1/transportRequests";
-const CLIENT_ID = ctmsDest.credentials.clientid;
-const CLIENT_SECRET = ctmsDest.credentials.clientsecret;
-const TOKEN_URL = ctmsDest.credentials.tokenServiceURL;
-
-// Endpoint: /risk
+const port = process.env.PORT || 8080; // Cloud Foundry assigns PORT
+ 
+// Hard-coded credentials
+const CLIENT_ID = "sb-5815b58b-c90b-4116-84b8-487862d5bd0c!b519913|alm-ts-backend!b1896";
+const CLIENT_SECRET = "76959eb9-a3c7-460e-8ef3-a62f6d1685a6$Klc0xzqacbuzDMiqzcQTSA8t5AokTl0qYS407tJQtXs="; // put actual secret
+const TOKEN_URL = "https://hcl-integrationsuite-qxeoz78m.authentication.eu10.hana.ondemand.com/oauth/token";
+const CTMS_URL = "https://hcl-integrationsuite-qxeoz78m.ts.cfapps.eu10.hana.ondemand.com/v1/transportRequests";
+ 
+// Endpoint to fetch transports
 app.get("/risk", async (req, res) => {
   try {
-    // 1️⃣ Get OAuth token using client credentials
     const tokenResp = await axios.post(
       TOKEN_URL,
       "grant_type=client_credentials",
@@ -42,27 +22,21 @@ app.get("/risk", async (req, res) => {
         auth: { username: CLIENT_ID, password: CLIENT_SECRET }
       }
     );
-
+ 
     const token = tokenResp.data.access_token;
-    if (!token) return res.status(500).json({ error: "No access token received" });
-
-    // 2️⃣ Call CTMS transport API
+ 
     const transportsResp = await axios.get(CTMS_URL, {
       headers: { Authorization: `Bearer ${token}` }
     });
-
-    // 3️⃣ Return JSON
+ 
     res.json(transportsResp.data);
   } catch (err) {
-    console.error("Error fetching transports:", err.response?.data || err.message);
+    console.error(err.response?.data || err.message);
     res.status(500).json({ error: err.response?.data || err.message });
   }
 });
-
-// Default route
-app.get("/", (req, res) => {
-  res.send("AI Transport Risk Demo Backend Running");
-});
-
-// Start server
+ 
+// Serve Fiori dashboard
+app.use(express.static(path.join(__dirname)));
+ 
 app.listen(port, () => console.log(`Server running on port ${port}`));
