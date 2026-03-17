@@ -57,8 +57,8 @@ async function callAI(transportList) {
   try {
     const token = await getToken(ai);
  
-    const DEPLOYMENT_ID = "d4161b55660f65ea"; // 🔴 replace this
-    const RESOURCE_GROUP = "vm-041024"; // 🔴 change if needed
+    const DEPLOYMENT_ID = "d0a821607261e42f"; // 🔴 replace this
+    const RESOURCE_GROUP = "default"; // 🔴 change if needed
  
     const AI_URL =
       ai.serviceurls.AI_API_URL +
