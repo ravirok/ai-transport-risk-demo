@@ -44,13 +44,18 @@ async function getTransports() {
     headers: { Authorization: `Bearer ${token}` }
   });
  
-  return res.data;
+  console.log("✅ CTMS RAW:", JSON.stringify(res.data).slice(0, 200));
+ 
+  // ✅ FIX: Always return array
+  return Array.isArray(res.data)
+    ? res.data
+    : res.data.transports || [];
 }
  
 /* =========================
    AI CORE CALL
 ========================= */
-async function callAI(transports) {
+async function callAI(transportList) {
   try {
     const token = await getToken(ai);
  
@@ -59,7 +64,7 @@ async function callAI(transports) {
       "/v2/inference/deployments/d8c15a12e70048c1/invocations";
  
     const payload = {
-      instances: transports.map(tr => ({
+      instances: transportList.map(tr => ({
         text: `${tr.description || ""} ${tr.origin || ""}`
       }))
     };
@@ -111,21 +116,29 @@ function fallbackRisk(tr) {
 ========================= */
 app.get("/risk", async (req, res) => {
   try {
-    const transports = await getTransports();
+    const transportList = await getTransports();
  
-    let aiResult = await callAI(transports);
+    if (!transportList.length) {
+      return res.json({
+        message: "No transports found"
+      });
+    }
+ 
+    let aiResult = await callAI(transportList);
  
     let finalData;
  
     if (aiResult && aiResult.predictions) {
-      finalData = transports.map((tr, i) => ({
+      // ✅ AI SUCCESS
+      finalData = transportList.map((tr, i) => ({
         ...tr,
         risk_score: aiResult.predictions[i]?.score || "0.5",
         risk_level: aiResult.predictions[i]?.label || "MEDIUM",
         ai_status: { status: "AI_CORE" }
       }));
     } else {
-      finalData = transports.map(tr => ({
+      // ✅ FALLBACK
+      finalData = transportList.map(tr => ({
         ...tr,
         ...fallbackRisk(tr)
       }));
@@ -134,7 +147,7 @@ app.get("/risk", async (req, res) => {
     res.json(finalData);
  
   } catch (err) {
-    console.error("❌ ERROR:", err.message);
+    console.error("❌ MAIN ERROR:", err.message);
  
     res.json([
       {
