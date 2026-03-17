@@ -6,8 +6,8 @@ const app = express();
 const port = process.env.PORT || 8080; // Cloud Foundry assigns PORT
  
 // Hard-coded credentials
-const CLIENT_ID = "sb-5815b58b-c90b-4116-84b8-487862d5bd0c!b519913|alm-ts-backend!b1896";
-const CLIENT_SECRET = "76959eb9-a3c7-460e-8ef3-a62f6d1685a6$Klc0xzqacbuzDMiqzcQTSA8t5AokTl0qYS407tJQtXs="; // put actual secret
+const CLIENT_ID = "sb-ddf0bce3-5cdc-4acd-a625-ac4baac0cdcc!b519913|alm-ts-backend!b1896";
+const CLIENT_SECRET = "5236aeb1-1ab7-4966-89c1-98ba7af62b20$rmnJPclZPUV5R-6MTvoFrY6n7DNUYra7lakkIA18Gdk="; // put actual secret
 const TOKEN_URL = "https://hcl-integrationsuite-qxeoz78m.authentication.eu10.hana.ondemand.com/oauth/token";
 const CTMS_URL = "https://hcl-integrationsuite-qxeoz78m.ts.cfapps.eu10.hana.ondemand.com/v1/transportRequests";
  
