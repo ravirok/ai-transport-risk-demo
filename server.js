@@ -10,16 +10,14 @@ app.use(express.json());
 const key = JSON.parse(fs.readFileSync("./ai-core-key.json", "utf8"));
  
 // 🔹 Config
-const AI_API_URL =
-  key?.serviceurls?.AI_API_URL ||
-  "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com";
- 
+const AI_API_URL = key.serviceurls.AI_API_URL;
 const TOKEN_URL = key.url + "/oauth/token";
 const CLIENT_ID = key.clientid;
 const CLIENT_SECRET = key.clientsecret;
  
-const DEPLOYMENT_ID = "d986abe0ffe5cff8";
-const RESOURCE_GROUP = "default";
+const DEPLOYMENT_ID = "d986abe0ffe5cff8"; // Replace with your deployment ID
+const RESOURCE_GROUP = "default";          // Replace with your resource group
+const WORKSPACE = "genai";                 // Explicit workspace header
  
 // 🔐 Get OAuth Token
 async function getToken() {
@@ -39,7 +37,7 @@ async function getToken() {
   return res.data.access_token;
 }
  
-// 🚀 TEST API
+// 🚀 Test AI endpoint
 app.get("/test-ai", async (req, res) => {
   try {
     console.log("🚀 Calling AI Core...");
@@ -52,12 +50,15 @@ app.get("/test-ai", async (req, res) => {
     const response = await axios.post(
       url,
       {
-        input: "Hello from SAP AI Core"
+        input: {
+          prompt: "Hello from SAP AI Core"
+        }
       },
       {
         headers: {
           Authorization: `Bearer ${token}`,
           "AI-Resource-Group": RESOURCE_GROUP,
+          "AI-Workspace": WORKSPACE,
           "Content-Type": "application/json"
         }
       }
@@ -79,9 +80,8 @@ app.get("/", (req, res) => {
   res.send("✅ AI Core Mistral App Running");
 });
  
-// 🔥 BTP compatible port
+// 🔥 Port
 const PORT = process.env.PORT || 3000;
- 
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
