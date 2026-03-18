@@ -60,15 +60,40 @@ app.get("/check-deployment", async (req, res) => {
   }
 });
  
-// ------------------------ Endpoint 2: Test AI (POST) ------------------------
-// Dynamic input from request body
-// { "prompt": "Your text here" }
+// ------------------------ Endpoint 2: Quick Test AI (GET) ------------------------
+// Static prompt, triggers internal POST
+app.get("/quick-test-ai", async (req, res) => {
+  try {
+    const token = await getToken();
+    const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
+    console.log("Calling LM URL (quick GET test):", url);
+ 
+    const response = await axios.post(
+      url,
+      { input: [{ role: "user", content: "Hello from SAP AI Core (Quick GET Test)" }] },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "AI-Resource-Group": RESOURCE_GROUP,
+          "AI-Workspace": WORKSPACE,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+ 
+    res.json(response.data);
+  } catch (err) {
+    console.error("Quick LM GET TEST ERROR:", err.response?.data || err.message);
+    res.status(500).json(err.response?.data || err.message);
+  }
+});
+ 
+// ------------------------ Endpoint 3: Test AI (POST) ------------------------
+// Dynamic prompt from request body
 app.post("/test-ai", async (req, res) => {
   try {
     const { prompt } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ error: "Missing 'prompt' in request body" });
-    }
+    if (!prompt) return res.status(400).json({ error: "Missing 'prompt' in request body" });
  
     const token = await getToken();
     const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
@@ -76,11 +101,7 @@ app.post("/test-ai", async (req, res) => {
  
     const response = await axios.post(
       url,
-      {
-        input: [
-          { role: "user", content: prompt }
-        ]
-      },
+      { input: [{ role: "user", content: prompt }] },
       {
         headers: {
           Authorization: `Bearer ${token}`,
