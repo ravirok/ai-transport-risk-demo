@@ -1,5 +1,5 @@
 // =========================
-// server.js - AI Transport Risk
+// server.js - AI Transport Risk Dashboard
 // =========================
 const express = require("express");
 const axios = require("axios");
@@ -39,10 +39,22 @@ async function getToken(uua) {
 // =========================
 async function getTransports() {
   const token = await getToken(ctms.uaa);
+ 
   const res = await axios.get(`${ctms.uri}/v1/transportRequests`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res.data || [];
+ 
+  let transports = [];
+ 
+  if (Array.isArray(res.data)) {
+    transports = res.data;
+  } else if (res.data?.transports && Array.isArray(res.data.transports)) {
+    transports = res.data.transports;
+  } else {
+    console.warn("⚠ Unexpected CTMS response format:", res.data);
+  }
+ 
+  return transports;
 }
  
 // =========================
@@ -53,10 +65,10 @@ async function callAI(transports) {
  
   try {
     const token = await getToken(ai);
-    const AI_URL = `${ai.serviceurls.AI_API_URL}/v2/completions`; // Foundation model
  
+    const AI_URL = `${ai.serviceurls.AI_API_URL}/v2/completions`; // Foundation Model
     const payload = {
-      model: ai.model_name || "gpt-4", // e.g., gpt-4
+      model: ai.model_name || "gpt-4",
       input: transports.map(tr => `${tr.description || ""} ${tr.origin || ""}`)
     };
  
@@ -65,7 +77,7 @@ async function callAI(transports) {
     const res = await axios.post(AI_URL, payload, {
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       }
     });
  
@@ -89,6 +101,7 @@ function fallbackRisk(tr) {
   if (text.includes("prod")) score += 0.3;
   if (text.includes("bug")) score += 0.2;
   if (text.includes("hotfix")) score += 0.4;
+ 
   if (score > 1) score = 1;
  
   let level = "LOW";
@@ -103,11 +116,13 @@ function fallbackRisk(tr) {
 }
  
 // =========================
-// Main API
+// Main API - /risk
 // =========================
 app.get("/risk", async (req, res) => {
   try {
     const transports = await getTransports();
+    console.log("Fetched transports:", transports);
+ 
     const aiResult = await callAI(transports);
  
     const finalData = (aiResult && Array.isArray(aiResult.predictions))
@@ -138,4 +153,3 @@ app.get("/risk", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
- 
