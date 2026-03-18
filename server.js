@@ -1,45 +1,63 @@
-// test-aicore.js
+const express = require("express");
 const axios = require("axios");
 const fs = require("fs");
+ 
+const app = express();
+app.use(express.json());
  
 // ------------------------ Load AI Core key ------------------------
 const config = JSON.parse(fs.readFileSync("./ai-core-key.json"));
  
-const ai_api_url = config['serviceurls']['AI_API_URL'];
+const ai_api_url = config.serviceurls.AI_API_URL; // use AI Core URL
 const TOKEN_URL = config.url + "/oauth/token";
 const CLIENT_ID = config.clientid;
 const CLIENT_SECRET = config.clientsecret;
  
 // ------------------------ LM Deployment ------------------------
 const LM_DEPLOYMENT_ID = "dd219ec1aca776c3"; // replace with your deployment ID
-const RESOURCE_GROUP = "default";
-const WORKSPACE = "genai";
+const RESOURCE_GROUP = "default"; // your resource group
+const WORKSPACE = "genai";        // workspace used in AI Core
  
-// ------------------------ Generate Access Token ------------------------
+// ------------------------ Get Access Token ------------------------
 async function getToken() {
   const res = await axios.post(
     TOKEN_URL,
     new URLSearchParams({ grant_type: "client_credentials" }),
     {
-      auth: {
-        username: CLIENT_ID,
-        password: CLIENT_SECRET,
-      },
+      auth: { username: CLIENT_ID, password: CLIENT_SECRET },
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     }
   );
   return res.data.access_token;
 }
  
-// ------------------------ Test LM deployment ------------------------
-async function testLM() {
+// ------------------------ Check Deployment (GET metadata) ------------------------
+app.get("/check-deployment", async (req, res) => {
   try {
     const token = await getToken();
     const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "AI-Resource-Group": RESOURCE_GROUP,
+        "AI-Workspace": WORKSPACE,
+      },
+    });
+    res.json({ message: "Deployment reachable", data: response.data });
+  } catch (err) {
+    res.status(500).json(err.response?.data || err.message);
+  }
+});
  
-    const prompt = "Hello, test SAP AI Core";
-    console.log("Sending prompt:", prompt);
+// ------------------------ Test AI (POST) ------------------------
+app.post("/test-ai", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "Missing 'prompt'" });
  
+    const token = await getToken();
+    const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
+    
     const response = await axios.post(
       url,
       { input: [{ role: "user", content: prompt }] },
@@ -53,11 +71,14 @@ async function testLM() {
       }
     );
  
-    console.log("LM Response:");
-    console.log(JSON.stringify(response.data, null, 2));
+    res.json(response.data);
   } catch (err) {
-    console.error("LM Test ERROR:", err.response?.data || err.message);
+    res.status(500).json(err.response?.data || err.message);
   }
-}
+});
  
-testLM();
+// ------------------------ Start Server ------------------------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`AI Core server running externally on port ${PORT}`);
+});
