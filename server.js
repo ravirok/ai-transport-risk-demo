@@ -9,26 +9,17 @@ app.use(express.json());
 // 🔹 Load AI Core key JSON
 const key = JSON.parse(fs.readFileSync("./ai-core-key.json", "utf8"));
  
-// 🔥 SAFE CONFIG (no undefined errors)
+// 🔹 Config
 const AI_API_URL =
   key?.serviceurls?.AI_API_URL ||
   "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com";
  
-const TOKEN_URL =
-  key?.url
-    ? key.url + "/oauth/token"
-    : "https://hclbuild-g03o2ijo.authentication.eu10.hana.ondemand.com/oauth/token";
- 
+const TOKEN_URL = key.url + "/oauth/token";
 const CLIENT_ID = key.clientid;
 const CLIENT_SECRET = key.clientsecret;
  
 const DEPLOYMENT_ID = "d986abe0ffe5cff8";
 const RESOURCE_GROUP = "default";
- 
-// 🧪 Debug logs (remove later)
-console.log("AI_API_URL:", AI_API_URL);
-console.log("TOKEN_URL:", TOKEN_URL);
-console.log("DEPLOYMENT_ID:", DEPLOYMENT_ID);
  
 // 🔐 Get OAuth Token
 async function getToken() {
@@ -45,7 +36,6 @@ async function getToken() {
       }
     }
   );
- 
   return res.data.access_token;
 }
  
@@ -56,18 +46,13 @@ app.get("/test-ai", async (req, res) => {
  
     const token = await getToken();
  
-    const url = `${AI_API_URL}/v2/inference/deployments/${DEPLOYMENT_ID}/invocations`;
+    const url = `${AI_API_URL}/v2/inference/deployments/${DEPLOYMENT_ID}/predict`;
     console.log("👉 URL:", url);
  
     const response = await axios.post(
       url,
       {
-        messages: [
-          {
-            role: "user",
-            content: "Say HELLO"
-          }
-        ]
+        input: "Hello from SAP AI Core"
       },
       {
         headers: {
@@ -91,13 +76,12 @@ app.get("/test-ai", async (req, res) => {
  
 // 🟢 Root check
 app.get("/", (req, res) => {
-  res.send("✅ AI Core App Running");
+  res.send("✅ AI Core Mistral App Running");
 });
  
-// 🔥 BTP Compatible PORT
+// 🔥 BTP compatible port
 const PORT = process.env.PORT || 3000;
  
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
- 
