@@ -70,7 +70,7 @@ async function callAI(transports) {
 
     const AI_URL =
       `${ai.serviceurls.AI_API_URL}` +
-      `/v2/inference/deployments/de0489d59e5a01b8/v2/invocations`;
+      `/ai/fm/v1/completions`;
 
     const payload = {
       input: transports.map(tr => ({
