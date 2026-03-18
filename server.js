@@ -57,12 +57,12 @@ async function callAI(transportList) {
   try {
     const token = await getToken(ai);
 
-    const DEPLOYMENT_ID = "d0a821607261e42f"; // 🔴 replace this
+    const DEPLOYMENT_ID = "d8c15a12e70048c1"; // 🔴 replace this
     const RESOURCE_GROUP = "default"; // 🔴 change if needed
 
     const AI_URL =
       ai.serviceurls.AI_API_URL +
-      `/v2/inference/deployments/${DEPLOYMENT_ID}/completions`;
+      `/v2/inference/deployments/${DEPLOYMENT_ID}/invocations`;
 
     console.log("AI URL:", AI_URL);
     console.log("Resource Group:", RESOURCE_GROUP);
