@@ -44,7 +44,7 @@ app.get("/test-ai", async (req, res) => {
  
     const token = await getToken();
  
-    const url = `${AI_API_URL}/v2/lm/deployments/${DEPLOYMENT_ID}/predict`;
+    const url = `${AI_API_URL}/v2/lm/deployments/${DEPLOYMENT_ID}`;
     console.log("👉 URL:", url);
  
     const response = await axios.post(
