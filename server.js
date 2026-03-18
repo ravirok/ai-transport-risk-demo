@@ -1,3 +1,6 @@
+// =========================
+// server.js - AI Transport Risk
+// =========================
 const express = require("express");
 const axios = require("axios");
 const fs = require("fs");
@@ -6,111 +9,82 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
  
-/* =========================
-   LOAD CONFIG FILES
-========================= */
-const ctms = JSON.parse(fs.readFileSync("./ctms-key.json"));
-const ai = JSON.parse(fs.readFileSync("./ai-core-key.json"));
+// =========================
+// Load Config
+// =========================
+const ctms = JSON.parse(fs.readFileSync(path.join(__dirname, "ctms-key.json")));
+const ai = JSON.parse(fs.readFileSync(path.join(__dirname, "ai-core-key.json")));
  
-/* =========================
-   SERVE FRONTEND (SUBPATH SAFE)
-========================= */
-app.use(express.static(path.join(__dirname, "public")));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+// =========================
+// Serve Frontend
+// =========================
+app.use(express.static("public"));
  
-/* =========================
-   GET UAA TOKEN FUNCTION
-========================= */
+// =========================
+// Get Token Function
+// =========================
 async function getToken(uua) {
-  const tokenUrl = `${uua.url}/oauth/token`;
-  const res = await axios.post(
-    tokenUrl,
-    "grant_type=client_credentials",
-    {
-      auth: {
-        username: uua.clientid,
-        password: uua.clientsecret
-      },
-      headers: { "Content-Type": "application/x-www-form-urlencoded" }
-    }
-  );
+  const tokenUrl = uua.url + "/oauth/token";
+ 
+  const res = await axios.get(tokenUrl, {
+    params: { grant_type: "client_credentials" },
+    auth: { username: uua.clientid, password: uua.clientsecret },
+  });
+ 
   return res.data.access_token;
 }
  
-/* =========================
-   FETCH CTMS TRANSPORTS
-========================= */
+// =========================
+// Fetch Transports from CTMS
+// =========================
 async function getTransports() {
   const token = await getToken(ctms.uaa);
   const res = await axios.get(`${ctms.uri}/v1/transportRequests`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` },
   });
-  return res.data;
+  return res.data || [];
 }
  
-/* =========================
-   AI RISK SCORING (Foundation GPT / Gemini)
-========================= */
+// =========================
+// Call AI Core / Foundation Model
+// =========================
 async function callAI(transports) {
+  if (!transports.length) return null;
+ 
   try {
     const token = await getToken(ai);
+    const AI_URL = `${ai.serviceurls.AI_API_URL}/v2/completions`; // Foundation model
  
-    const AI_URL = `${ai.serviceurls.AI_API_URL}/v2/completions`;
+    const payload = {
+      model: ai.model_name || "gpt-4", // e.g., gpt-4
+      input: transports.map(tr => `${tr.description || ""} ${tr.origin || ""}`)
+    };
  
-    const finalResults = [];
+    console.log("➡ Sending to AI Core:", JSON.stringify(payload, null, 2));
  
-    for (const tr of transports) {
-      const payload = {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a transport risk analyst." },
-          {
-            role: "user",
-            content: `Analyze transport risk. Description: "${tr.description || ""}", Origin: "${tr.origin || ""}". Respond JSON: { "risk_level": "LOW|MEDIUM|HIGH", "risk_score": 0-1 }`
-          }
-        ],
-        max_tokens: 50
-      };
- 
-      const res = await axios.post(AI_URL, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        }
-      });
- 
-      // Parse GPT response JSON safely
-      let aiData;
-      try {
-        aiData = JSON.parse(res.data.choices[0].message.content);
-      } catch (e) {
-        aiData = null;
+    const res = await axios.post(AI_URL, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       }
+    });
  
-      finalResults.push({
-        ...tr,
-        risk_score: aiData?.risk_score?.toFixed(2) || 0.3,
-        risk_level: aiData?.risk_level || "LOW",
-        ai_status: { status: aiData ? "AI_CORE" : "FALLBACK_AI" }
-      });
-    }
- 
-    return finalResults;
+    console.log("✅ AI Core Response:", JSON.stringify(res.data, null, 2));
+    return res.data;
  
   } catch (e) {
-    console.error("❌ AI ERROR:", e.response?.data || e.message);
-    return null; // trigger fallback
+    console.error("❌ AI Core Error:", e.response?.data || e.message);
+    return null;
   }
 }
  
-/* =========================
-   FALLBACK LOGIC
-========================= */
+// =========================
+// Fallback Risk Scoring
+// =========================
 function fallbackRisk(tr) {
   let score = 0.3;
   const text = (tr.description || "").toLowerCase();
+ 
   if (text.includes("urgent")) score += 0.3;
   if (text.includes("prod")) score += 0.3;
   if (text.includes("bug")) score += 0.2;
@@ -128,39 +102,40 @@ function fallbackRisk(tr) {
   };
 }
  
-/* =========================
-   MAIN /risk API
-========================= */
+// =========================
+// Main API
+// =========================
 app.get("/risk", async (req, res) => {
   try {
     const transports = await getTransports();
-    let aiResult = await callAI(transports);
+    const aiResult = await callAI(transports);
  
-    let finalData = aiResult
-      ? aiResult
-      : transports.map(tr => ({
+    const finalData = (aiResult && Array.isArray(aiResult.predictions))
+      ? transports.map((tr, i) => ({
           ...tr,
-          ...fallbackRisk(tr)
-        }));
+          risk_score: aiResult.predictions[i]?.score || "0.5",
+          risk_level: aiResult.predictions[i]?.label || "MEDIUM",
+          ai_status: { status: "AI_CORE" }
+        }))
+      : transports.map(tr => ({ ...tr, ...fallbackRisk(tr) }));
  
-    res.json(finalData);
+    res.json(finalData); // Always proper JSON
   } catch (err) {
-    console.error("❌ MAIN ERROR:", err.message);
-    res.json([
-      {
-        id: "ERROR",
-        description: "System failed",
-        risk_level: "HIGH",
-        risk_score: "1.0",
-        ai_status: { status: "SYSTEM_ERROR" }
-      }
-    ]);
+    console.error("❌ Error in /risk:", err.message);
+    res.json([{
+      id: "ERROR",
+      description: "System failed",
+      risk_level: "HIGH",
+      risk_score: "1.0",
+      ai_status: { status: "SYSTEM_ERROR" }
+    }]);
   }
 });
  
-/* =========================
-   START SERVER
-========================= */
+// =========================
+// Start Server
+// =========================
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
+ 
