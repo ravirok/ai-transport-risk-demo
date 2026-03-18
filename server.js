@@ -15,7 +15,7 @@ const TOKEN_URL = key.url + "/oauth/token";
 const CLIENT_ID = key.clientid;
 const CLIENT_SECRET = key.clientsecret;
  
-const DEPLOYMENT_ID = "d986abe0ffe5cff8"; // Replace with your deployment ID
+const DEPLOYMENT_ID = "dd219ec1aca776c3"; // Replace with your deployment ID
 const RESOURCE_GROUP = "default";          // Replace with your resource group
 const WORKSPACE = "genai";                 // Explicit workspace header
  
