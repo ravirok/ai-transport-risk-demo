@@ -1,5 +1,5 @@
 // =========================
-// server.js - AI Transport Risk Dashboard
+// server.js - AI Transport Risk Dashboard (gpt-4o-mini)
 // =========================
 const express = require("express");
 const axios = require("axios");
@@ -25,12 +25,10 @@ app.use(express.static("public"));
 // =========================
 async function getToken(uua) {
   const tokenUrl = uua.url + "/oauth/token";
- 
   const res = await axios.get(tokenUrl, {
     params: { grant_type: "client_credentials" },
     auth: { username: uua.clientid, password: uua.clientsecret },
   });
- 
   return res.data.access_token;
 }
  
@@ -45,31 +43,28 @@ async function getTransports() {
   });
  
   let transports = [];
- 
-  if (Array.isArray(res.data)) {
-    transports = res.data;
-  } else if (res.data?.transports && Array.isArray(res.data.transports)) {
-    transports = res.data.transports;
-  } else {
-    console.warn("⚠ Unexpected CTMS response format:", res.data);
-  }
+  if (Array.isArray(res.data)) transports = res.data;
+  else if (res.data?.transports && Array.isArray(res.data.transports)) transports = res.data.transports;
+  else console.warn("⚠ Unexpected CTMS response:", res.data);
  
   return transports;
 }
  
 // =========================
-// Call AI Core / Foundation Model
+// Call AI Core / gpt-4o-mini
 // =========================
 async function callAI(transports) {
   if (!transports.length) return null;
  
   try {
     const token = await getToken(ai);
+    const AI_URL = `${ai.serviceurls.AI_API_URL}/v2/completions`;
  
-    const AI_URL = `${ai.serviceurls.AI_API_URL}/v2/completions`; // Foundation Model
     const payload = {
-      model: ai.model_name || "gpt-4",
-      input: transports.map(tr => `${tr.description || ""} ${tr.origin || ""}`)
+      model: ai.model_name, // gpt-4o-mini
+      input: transports.map(tr => `${tr.description || ""} ${tr.origin || ""}`),
+      max_output_tokens: 100,
+      temperature: 0
     };
  
     console.log("➡ Sending to AI Core:", JSON.stringify(payload, null, 2));
@@ -86,7 +81,7 @@ async function callAI(transports) {
  
   } catch (e) {
     console.error("❌ AI Core Error:", e.response?.data || e.message);
-    return null;
+    return null; // fallback
   }
 }
  
@@ -125,7 +120,8 @@ app.get("/risk", async (req, res) => {
  
     const aiResult = await callAI(transports);
  
-    const finalData = (aiResult && Array.isArray(aiResult.predictions))
+    // Map AI results or fallback
+    const finalData = Array.isArray(aiResult?.predictions)
       ? transports.map((tr, i) => ({
           ...tr,
           risk_score: aiResult.predictions[i]?.score || "0.5",
@@ -134,7 +130,8 @@ app.get("/risk", async (req, res) => {
         }))
       : transports.map(tr => ({ ...tr, ...fallbackRisk(tr) }));
  
-    res.json(finalData); // Always proper JSON
+    res.json(finalData); // always valid JSON
+ 
   } catch (err) {
     console.error("❌ Error in /risk:", err.message);
     res.json([{
