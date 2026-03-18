@@ -6,15 +6,16 @@ const app = express();
 app.use(express.json());
  
 // ------------------------ Load AI Core key ------------------------
-const key = JSON.parse(fs.readFileSync("./ai-core-key.json"));
+const config = JSON.parse(fs.readFileSync("./ai-core-key.json"));
  
-const AI_API_URL = key.serviceurls.AI_API_URL; // e.g., https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com
-const TOKEN_URL = key.url + "/oauth/token";   // auth URL from key
-const CLIENT_ID = key.clientid;
-const CLIENT_SECRET = key.clientsecret;
+const AI_API_URL = config.serviceurls.AI_API_URL;
+const ai_api_url = config['serviceurls']['AI_API_URL']; // added for RBAC access fix
+const TOKEN_URL = config.url + "/oauth/token";  
+const CLIENT_ID = config.clientid;
+const CLIENT_SECRET = config.clientsecret;
  
 // ------------------------ LM Deployment ------------------------
-const LM_DEPLOYMENT_ID = "dd219ec1aca776c3"; // Replace with your deployment ID
+const LM_DEPLOYMENT_ID = "dd219ec1aca776c3"; // replace with your deployment ID
 const RESOURCE_GROUP = "default";
 const WORKSPACE = "genai";
  
@@ -34,12 +35,36 @@ async function getToken() {
   return res.data.access_token;
 }
  
-// ------------------------ LM Endpoint ------------------------
+// ------------------------ Endpoint 1: Check Deployment (GET) ------------------------
+app.get("/check-deployment", async (req, res) => {
+  try {
+    const token = await getToken();
+    const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`; // using ai_api_url
+    console.log("Checking LM Deployment URL:", url);
+ 
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "AI-Resource-Group": RESOURCE_GROUP,
+        "AI-Workspace": WORKSPACE,
+      },
+    });
+ 
+    res.json({
+      message: "Deployment reachable",
+      data: response.data,
+    });
+  } catch (err) {
+    console.error("Deployment CHECK ERROR:", err.response?.data || err.message);
+    res.status(500).json(err.response?.data || err.message);
+  }
+});
+ 
+// ------------------------ Endpoint 2: LM Prediction (POST) ------------------------
 app.get("/test-ai", async (req, res) => {
   try {
     const token = await getToken();
- 
-    const url = `${AI_API_URL}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
+    const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`; // using ai_api_url
     console.log("Calling LM URL:", url);
  
     const response = await axios.post(
@@ -66,7 +91,8 @@ app.get("/test-ai", async (req, res) => {
   }
 });
  
-// ------------------------ Start Server ------------------------
-const PORT = 3000;
-app.listen(PORT, () => console.log(`AI Core server running on port ${PORT}`));
- 
+// ------------------------ Start Server (External Access) ------------------------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`AI Core server running externally on port ${PORT}`);
+});
