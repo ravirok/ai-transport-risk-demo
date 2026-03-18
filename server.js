@@ -1,16 +1,12 @@
-const express = require("express");
+// test-aicore.js
 const axios = require("axios");
 const fs = require("fs");
- 
-const app = express();
-app.use(express.json());
  
 // ------------------------ Load AI Core key ------------------------
 const config = JSON.parse(fs.readFileSync("./ai-core-key.json"));
  
-const AI_API_URL = config.serviceurls.AI_API_URL;
-const ai_api_url = config['serviceurls']['AI_API_URL']; // RBAC fix
-const TOKEN_URL = config.url + "/oauth/token";  
+const ai_api_url = config['serviceurls']['AI_API_URL'];
+const TOKEN_URL = config.url + "/oauth/token";
 const CLIENT_ID = config.clientid;
 const CLIENT_SECRET = config.clientsecret;
  
@@ -35,69 +31,14 @@ async function getToken() {
   return res.data.access_token;
 }
  
-// ------------------------ Endpoint 1: Check Deployment ------------------------
-app.get("/check-deployment", async (req, res) => {
+// ------------------------ Test LM deployment ------------------------
+async function testLM() {
   try {
     const token = await getToken();
     const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
-    console.log("Checking LM Deployment URL:", url);
  
-    const response = await axios.get(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "AI-Resource-Group": RESOURCE_GROUP,
-        "AI-Workspace": WORKSPACE,
-      },
-    });
- 
-    res.json({
-      message: "Deployment reachable",
-      data: response.data,
-    });
-  } catch (err) {
-    console.error("Deployment CHECK ERROR:", err.response?.data || err.message);
-    res.status(500).json(err.response?.data || err.message);
-  }
-});
- 
-// ------------------------ Endpoint 2: Quick Test AI (GET) ------------------------
-// Static prompt, triggers internal POST
-app.get("/quick-test-ai", async (req, res) => {
-  try {
-    const token = await getToken();
-    const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
-    console.log("Calling LM URL (quick GET test):", url);
- 
-    const response = await axios.post(
-      url,
-      { input: [{ role: "user", content: "Hello from SAP AI Core (Quick GET Test)" }] },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "AI-Resource-Group": RESOURCE_GROUP,
-          "AI-Workspace": WORKSPACE,
-          "Content-Type": "application/json",
-        },
-      }
-    );
- 
-    res.json(response.data);
-  } catch (err) {
-    console.error("Quick LM GET TEST ERROR:", err.response?.data || err.message);
-    res.status(500).json(err.response?.data || err.message);
-  }
-});
- 
-// ------------------------ Endpoint 3: Test AI (POST) ------------------------
-// Dynamic prompt from request body
-app.post("/test-ai", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Missing 'prompt' in request body" });
- 
-    const token = await getToken();
-    const url = `${ai_api_url}/v2/lm/deployments/${LM_DEPLOYMENT_ID}`;
-    console.log("Calling LM URL (POST with dynamic input):", url);
+    const prompt = "Hello, test SAP AI Core";
+    console.log("Sending prompt:", prompt);
  
     const response = await axios.post(
       url,
@@ -112,15 +53,11 @@ app.post("/test-ai", async (req, res) => {
       }
     );
  
-    res.json(response.data);
+    console.log("LM Response:");
+    console.log(JSON.stringify(response.data, null, 2));
   } catch (err) {
-    console.error("LM POST ERROR:", err.response?.data || err.message);
-    res.status(500).json(err.response?.data || err.message);
+    console.error("LM Test ERROR:", err.response?.data || err.message);
   }
-});
+}
  
-// ------------------------ Start Server (External Access) ------------------------
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`AI Core server running externally on port ${PORT}`);
-});
+testLM();
