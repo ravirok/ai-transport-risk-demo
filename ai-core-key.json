@@ -10,3 +10,17 @@
   "url": "https://hclbuild-g03o2ijo.authentication.eu10.hana.ondemand.com",
   "credential-type": "binding-secret"
 }
+{
+    "backendDetails": {
+        "model": {
+            "name": "gpt-4o-mini",
+            "version": "latest"
+        }
+    },
+    "backend_details": {
+        "model": {
+            "name": "gpt-4o-mini",
+            "version": "latest"
+        }
+    }
+}
