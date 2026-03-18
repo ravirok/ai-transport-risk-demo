@@ -14,7 +14,7 @@ const TOKEN_URL = key.url + "/oauth/token";
 const CLIENT_ID = key.clientid;
 const CLIENT_SECRET = key.clientsecret;
  
-const DEPLOYMENT_ID = "d98abe0ffe5cff8";
+const DEPLOYMENT_ID = "d986abe0ffe5cff8";
 const RESOURCE_GROUP = "default";
  
 // 🔐 Token
