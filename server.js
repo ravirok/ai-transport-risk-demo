@@ -62,7 +62,7 @@ async function callAI(transportList) {
 
     const AI_URL =
       ai.serviceurls.AI_API_URL +
-      `/v2/inference/deployments/${DEPLOYMENT_ID}/`;
+      `/v2/inference/deployments/${DEPLOYMENT_ID}/v2/predict`;
 
     console.log("AI URL:", AI_URL);
     console.log("Resource Group:", RESOURCE_GROUP);
